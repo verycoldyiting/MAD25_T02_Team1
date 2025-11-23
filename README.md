@@ -109,22 +109,24 @@ Entertainment
 1. Dynamic Event Information:
 
 * Event details are populated from data in Firebase.
-* Includes:
-  ** Artist: Name of the performing artist or group.
-  ** Genre: Type of music or performance.
-Date and Time: Scheduled date and time of the event.
-Venue: Location of the event.
-Description: Detailed information about the event.
-Ticket Price: Cost of attending the event.
-General Sales: Date and time when tickets go on sale.
-View Seat Map:
+    * Includes:
+        * **Artist:** Name of the performing artist or group.
+        * **Genre:** Type of music or performance.
+        * **Date and Time:** Scheduled date and time of the event.
+        * **Venue:** Location of the event.
+        * **Description:** Detailed information about the event.
+        * **Ticket Price:** Cost of attending the event.
+        * **General Sales:** Date and time when tickets go on sale.
+2. View Seat Map:
 
-A dialogue allows users to see the concert location map.
-Includes detailed seating arrangements and ticket pricing.
-Buy Tickets Button:
+* A dialogue allows users to see the concert location map.
+* Includes detailed seating arrangements and ticket pricing.
+3. Buy Tickets Button:
 
-Directs users to the ticket purchasing page.
-Ensures a seamless process for ticket acquisition.
+* Directs users to the ticket purchasing page.
+* Ensures a seamless process for ticket acquisition.
+
+
 # Planned task(s) and feature(s) allocation of each member in the team for Stage 2.
 # Stage 2 Implementation:
 Natalie -

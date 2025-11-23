@@ -28,20 +28,41 @@ Entertainment
 
 # TicketLah! App Stage 1 Features:
 ## Login/Register Page [Daphne Cheng & Valerie Kho]
-* Login/Register Fragment:
-
+1. Login/Register Fragment:
 * Provides a fragment that allows users to choose to login or register.
 * Offers a seamless transition between login and registration forms.
-* Firebase Integration:
 
-Account information is checked through Firebase.
-Newly created accounts are updated in Firebase for secure management using Firebase Authentication.
-Ensures user data is managed safely and efficiently, leveraging Firebase's robust authentication mechanisms.
-Forget Password Option:
+2. Firebase Integration:
+* Account information is checked through Firebase.
+* Newly created accounts are updated in Firebase for secure management using Firebase Authentication.
+* Ensures user data is managed safely and efficiently, leveraging Firebase's robust authentication mechanisms.
 
-Available in the login fragment.
-Prompts a dialogue box asking users for their email.
-Users can press the cross to exit the dialogue.
+3. Forget Password Option:
+* Available in the login fragment.
+* Prompts a dialogue box asking users for their email.
+* Users can press the cross to exit the dialogue.
+
+## Profile Page [Daphne Cheng]
+1. View Account Information:
+
+* Displays the user's account information.
+* Data is dynamically populated from Firebase, ensuring it is always up-to-date.
+2. Edit Profile:
+
+* Users can edit their profile information by pressing the pencil icon next to the fields.
+* Provides an intuitive and user-friendly way to make changes to personal details.
+3. Password Visibility Toggle:
+
+* Users can check the checkbox to show their password.
+* Allows users to verify their input for accuracy, enhancing security and reducing login erros.
+4. Logout Button:
+
+* Allows users to log out of their account.
+* Provides a secure way to end the session.
+5. Save Button:
+
+* Allows users to save updated account information.
+* Ensures changes are stored and reflected in their profile and stored in Firebase.
 
 
 # Planned task(s) and feature(s) allocation of each member in the team for Stage 2.

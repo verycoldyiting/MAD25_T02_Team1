@@ -64,7 +64,67 @@ Entertainment
 * Allows users to save updated account information.
 * Ensures changes are stored and reflected in their profile and stored in Firebase.
 
+## Home Page [Valerie Kho]
+1. Consistent Header:
 
+* The header remains visible and consistent across all pages.
+2. Side Scroll View for "Upcoming Events":
+
+* Displays a horizontal scrolling list of upcoming events.
+* The top 3 events are displayed based on their upcoming dates.
+* Event information is dynamically extracted from Firebase and populated on the interface.
+3. "Recommended for You" Section:
+
+* Shows a recycler view of events recommended for the user.
+* Recommendations allows user to view the available list of events that are happening in singapore.
+4. Dynamic Event Picture:
+
+* The featured event picture displayed below the header changes randomly.
+* Each time the user refreshes the page, a new image is shown.
+5. User-Friendly Footer:
+
+* Contains navigation icons for easier movement through the app.
+* Designed to be intuitive and enhance the user experience.
+
+## Footer Navigation [Valerie Kho]
+* The footer navigation includes icons that links to the Homepage, Explore Events, Booking History, and Profile Page for easy access and seamless user experience.
+
+## Explore Event Page [Natalie Wong]
+1. Event Search:
+
+* Allows users to search events by title or artist.
+* Provides a user-friendly interface for quick event discovery.
+2. Filter Options:
+* Users can filter events by price, event type, or date.
+* Price and event type options are dynamic and depend on the database.
+* Users can clear the selected filters by using the "Clear Filters" button.
+* Ensures users can find events that meet their preferences.
+* Made scrollable to ensure responsiveness in landscape orientation.
+3. RecyclerView of Events:
+
+* Displays a list of different events at the bottom of the page.
+* Events are dynamically populated from Firebase.
+
+## Event Details Page [Natalie Wong]
+1. Dynamic Event Information:
+
+* Event details are populated from data in Firebase.
+* Includes:
+  ** Artist: Name of the performing artist or group.
+  ** Genre: Type of music or performance.
+Date and Time: Scheduled date and time of the event.
+Venue: Location of the event.
+Description: Detailed information about the event.
+Ticket Price: Cost of attending the event.
+General Sales: Date and time when tickets go on sale.
+View Seat Map:
+
+A dialogue allows users to see the concert location map.
+Includes detailed seating arrangements and ticket pricing.
+Buy Tickets Button:
+
+Directs users to the ticket purchasing page.
+Ensures a seamless process for ticket acquisition.
 # Planned task(s) and feature(s) allocation of each member in the team for Stage 2.
 # Stage 2 Implementation:
 Natalie -

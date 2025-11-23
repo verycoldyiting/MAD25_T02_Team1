@@ -126,6 +126,75 @@ Entertainment
 * Directs users to the ticket purchasing page.
 * Ensures a seamless process for ticket acquisition.
 
+## Buy Tickets Page [Yu Hong]
+1. Image View of Map Including Seat Number:
+
+* Displays a visual map of the venue with seating arrangements.
+* Allows users to see the layout and select their preferred seats.
+2. Dropdown for Different Categories and Seat Numbers:
+
+* Populated from data stored in Firebase.
+* Users can select a seat category first, which filters available seat numbers.
+3. Seat Selection Logic:
+
+* Users can only choose a seat number after selecting a seat category.
+* Once both seat category and number are chosen, the bottom information will autofill.
+4 Edit View for Ticket Quantity:
+
+* Allows users to enter the number of tickets they wish to purchase.
+5. Toast Messages:
+
+* Alerts users of their choices.
+* Ensures users enter a quantity greater than 0.
+* If the user changes the seat category, the previously selected seat number will disappear, and the book button will be hidden to enforce the selection of a new seat number.
+6. Book Button:
+
+* Appears only when all information in the table is filled.
+* Ensures all necessary selections are made before proceeding.
+
+## Payment Details Page [Valerie Kho]
+1. Card and Billing Information:
+
+* Allows users to enter necessary card details and billing address.
+* Dropdown to allow users to choose their preferred card type.
+2. View Booking Button:
+
+* Opens a dialogue that shows booking information made by the user from the previous page.
+3. Total Price TextView:
+
+* Displays the total price the user has to pay.
+4. Buy Now Button:
+
+* Allows the user to complete the purchase.
+5. Toast Messages:
+
+* Alerts users if they enter any field incorrectly.
+6. Cancel Button:
+
+* Leads users back to the buy tickets page.
+
+## Booking History Page [Yu Hong]
+1. View Booking History:
+
+* Shows the booking history of the user, populated from Firebase.
+* Provides a comprehensive view of all bookings made by the user.
+2. Booking Information Cards:
+
+* Each card displays detailed information about a booking, including:
+    * **Seat Category**
+    * **Seat Number**
+    * **Total Price**
+    * **Quantity**
+    * **Payment Method**
+* Ensures users have easy access to their booking details.
+3. RecyclerView of Booking details
+
+* Displays a list of booking details that user had booked
+* Booking details are dynamically GET from the firebase for the specific user
+
+## Responsiveness implementation [Team]
+
+## Logo Implementation [Valerie]
 
 # Planned task(s) and feature(s) allocation of each member in the team for Stage 2.
 # Stage 2 Implementation:

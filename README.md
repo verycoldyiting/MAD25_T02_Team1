@@ -27,7 +27,7 @@ Entertainment
 
 
 # TicketLah! App Stage 1 Features:
-## Login/Register Page [Daphne Cheng & Valerie Kho]
+## Login/Register Page [Daphne Cheng]
 1. Login/Register Fragment:
 * Provides a fragment that allows users to choose to login or register.
 * Offers a seamless transition between login and registration forms.

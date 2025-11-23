@@ -193,7 +193,7 @@ Entertainment
 * Booking details are dynamically GET from the firebase for the specific user
 
 ## Responsiveness implementation [Team]
-
+* Ensures the app is responsive and adapts well across various screen sizes and orientations.
 ## Logo Implementation [Valerie]
 
 # Planned task(s) and feature(s) allocation of each member in the team for Stage 2.

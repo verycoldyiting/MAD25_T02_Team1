@@ -17,6 +17,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -64,32 +67,38 @@ class HomePage : ComponentActivity() {
 @Composable
 fun HomePageScaffold() {
 
-    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
+    val navController = rememberNavController()
+    var selectedTab by remember { mutableStateOf(BottomNavItem.Home) }
 
     Scaffold(
-        topBar = {
-            TicketLahHeader()   // ⭐ FIXED HEADER — same as Login page
-        },
+        topBar = { TicketLahHeader() },
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
-                onItemSelected = { selectedTab = it }
+                onItemSelected = { item ->
+                    selectedTab = item as BottomNavItem.Home
+                    navController.navigate(item.route) {
+                        launchSingleTop = true
+                        popUpTo(navController.graph.startDestinationId)
+                    }
+                }
             )
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .padding(
-                    top = innerPadding.calculateTopPadding() + 16.dp,
-                    bottom = innerPadding.calculateBottomPadding(),
-                    start = 16.dp,
-                    end = 16.dp
-                )
+
+        NavHost(
+            navController = navController,
+            startDestination = BottomNavItem.Home.route,
+            modifier = Modifier.padding(innerPadding)
         ) {
-            HomePageContent()
+            composable(BottomNavItem.Home.route) { HomePageContent() }
+            composable(BottomNavItem.Search.route) {  }
+            composable(BottomNavItem.Tickets.route) {  }
+            composable(BottomNavItem.Profile.route) {  }
         }
     }
 }
+
 
 
 // ----------------------------

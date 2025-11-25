@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "sg.edu.np.mad.mad25_t02_team1"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "sg.edu.np.mad.mad25_t02_team1"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

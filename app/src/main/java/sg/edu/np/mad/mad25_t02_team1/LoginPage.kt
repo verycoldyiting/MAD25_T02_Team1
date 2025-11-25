@@ -139,7 +139,7 @@ fun LoginScreen(
 
                     auth.signInWithEmailAndPassword(email, password)
                         .addOnSuccessListener {
-                            val intent = Intent(context, RegisterPage::class.java)
+                            val intent = Intent(context, HomePage::class.java)
                             context.startActivity(intent)
                         }
                         .addOnFailureListener {

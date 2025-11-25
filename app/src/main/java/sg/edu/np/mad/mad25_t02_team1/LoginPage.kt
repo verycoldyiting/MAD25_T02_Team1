@@ -80,13 +80,10 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        // ⭐ BLUE BAR — FULL WIDTH, TOUCHES TOP
         TicketLahHeader()
 
-        // ⭐ SPACE BETWEEN HEADER + TITLE
         Spacer(modifier = Modifier.height(200.dp))
 
-        // PAGE CONTENT WITH SIDE PADDING ONLY
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,7 +91,6 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // ⭐ TITLE AREA
             Text(
                 "Welcome to TicketLah!",
                 style = MaterialTheme.typography.headlineLarge
@@ -129,7 +125,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(36.dp))
 
-            // ⭐ LOGIN BUTTON
             val context = LocalContext.current
             val auth = FirebaseAuth.getInstance()
             var loginError by remember { mutableStateOf<String?>(null) }
@@ -181,7 +176,7 @@ fun LoginScreen(
             ) {
                 Text("Register")
             }
-            // Error dialog for wrong login
+
             loginError?.let { msg ->
                 AlertDialog(
                     onDismissRequest = { loginError = null },

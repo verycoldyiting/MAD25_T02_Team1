@@ -21,9 +21,9 @@ fun TicketLahHeader() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(85.dp)               // ⭐ Taller header (more professional)
+            .height(85.dp)
             .background(Color(0xFF007BFF)),
-        contentAlignment = Alignment.Center   // ⭐ Center everything
+        contentAlignment = Alignment.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -32,7 +32,7 @@ fun TicketLahHeader() {
             AsyncImage(
                 model = logoUrl,
                 contentDescription = "TicketLah Logo",
-                modifier = Modifier.size(40.dp)   // ⭐ Larger icon
+                modifier = Modifier.size(40.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))

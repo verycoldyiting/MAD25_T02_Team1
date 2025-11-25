@@ -143,13 +143,11 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                         return@Button
                     }
 
-                    // ⭐ Create Firebase Authentication account
                     auth.createUserWithEmailAndPassword(email, password)
                         .addOnSuccessListener { result ->
 
                             val uid = result.user?.uid ?: return@addOnSuccessListener
 
-                            // ⭐ Step 1: Get last account number from Firestore
                             db.collection("Account")
                                 .orderBy("accountId", com.google.firebase.firestore.Query.Direction.DESCENDING)
                                 .limit(1)
@@ -162,11 +160,9 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                                         "A000" // First user case
                                     }
 
-                                    // ⭐ Step 2: Extract number and increment
                                     val nextNumber = lastId.substring(1).toInt() + 1
                                     val newAccountId = "A" + nextNumber.toString().padStart(3, '0')
 
-                                    // ⭐ Step 3: Save user data into Account collection
                                     val userData = hashMapOf(
                                         "accountId" to newAccountId,
                                         "uid" to uid,
@@ -206,7 +202,6 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 Text("Register Now")
             }
 
-            // ⭐ Error Popup
             errorMessage?.let { msg ->
                 AlertDialog(
                     onDismissRequest = { errorMessage = null },
@@ -220,7 +215,6 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 )
             }
 
-            // ⭐ Success Popup
             if (showSuccessDialog) {
                 AlertDialog(
                     onDismissRequest = { },

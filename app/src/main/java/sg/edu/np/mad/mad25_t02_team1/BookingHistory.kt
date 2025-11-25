@@ -37,6 +37,51 @@ import java.util.*
 import kotlinx.coroutines.tasks.await
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.runtime.setValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import sg.edu.np.mad.mad25_t02_team1.BottomNavItem
+import sg.edu.np.mad.mad25_t02_team1.BottomNavigationBar
+import sg.edu.np.mad.mad25_t02_team1.HomePageContent
+import sg.edu.np.mad.mad25_t02_team1.TicketLahHeader
+
+
+
+@Composable
+fun BookingHistoryScaffold() {
+
+    val navController = rememberNavController()
+    var selectedTab by remember { mutableStateOf(BottomNavItem.Home) }
+
+    Scaffold(
+        topBar = { TicketLahHeader() },
+        bottomBar = {
+            BottomNavigationBar(
+                selectedItem = selectedTab,
+                onItemSelected = { item ->
+                    selectedTab = item as BottomNavItem.Home
+                    navController.navigate(item.route) {
+                        launchSingleTop = true
+                        popUpTo(navController.graph.startDestinationId)
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+
+        NavHost(
+            navController = navController,
+            startDestination = BottomNavItem.Home.route,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(BottomNavItem.Home.route) { HomePageContent() }
+            composable(BottomNavItem.Search.route) {  }
+            composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
+            composable(BottomNavItem.Profile.route) {  }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

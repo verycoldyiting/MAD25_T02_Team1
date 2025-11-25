@@ -22,7 +22,7 @@ fun TicketLahHeader() {
         modifier = Modifier
             .fillMaxWidth()
             .height(85.dp)
-            .background(Color(0xFF007BFF)),
+            .background(Color(0xFF00A2FF)),
         contentAlignment = Alignment.Center
     ) {
         Row(

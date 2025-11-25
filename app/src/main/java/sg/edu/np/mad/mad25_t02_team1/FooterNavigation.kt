@@ -10,14 +10,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class BottomNavItem(
     val title: String,
+    val route: String,
     val icon: ImageVector? = null,
     val iconPainter: Int? = null
 ) {
-    object Home : BottomNavItem("Home", icon = Icons.Default.Home)
-    object Search : BottomNavItem("Search", icon = Icons.Default.Search)
-    object Tickets : BottomNavItem("Tickets", iconPainter = R.drawable.ticket)
-    object Profile : BottomNavItem("Profile", icon = Icons.Default.Person)
+    object Home : BottomNavItem("Home", "home", icon = Icons.Default.Home)
+    object Search : BottomNavItem("Search", "search", icon = Icons.Default.Search)
+    object Tickets : BottomNavItem("Tickets", "tickets", iconPainter = R.drawable.ticket)
+    object Profile : BottomNavItem("Profile", "profile", icon = Icons.Default.Person)
 }
+
 
 @Composable
 fun BottomNavigationBar(
@@ -26,13 +28,14 @@ fun BottomNavigationBar(
 ) {
     NavigationBar(containerColor = Color(0xFF00A2FF)) {
 
-        listOf(
+        val items = listOf(
             BottomNavItem.Home,
             BottomNavItem.Search,
             BottomNavItem.Tickets,
             BottomNavItem.Profile
-        ).forEach { item ->
+        )
 
+        items.forEach { item ->
             NavigationBarItem(
                 selected = selectedItem == item,
                 onClick = { onItemSelected(item) },

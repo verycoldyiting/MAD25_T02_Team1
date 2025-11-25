@@ -12,22 +12,25 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MAD25_T02_Team1"
         tools:targetApi="31">
-
-        <!-- 🚀 HomePage is the launcher -->
         <activity
-            android:name=".HomePage"
-            android:exported="true">
+            android:name=".LoginScreen"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MAD25_T02_Team1">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Your MainActivity still exists if needed -->
         <activity
-            android:name=".MainActivity"
-            android:exported="false" />
-
+            android:name=".RegisterPage"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
+        <activity
+            android:name=".HomePage"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
     </application>
 
 </manifest>

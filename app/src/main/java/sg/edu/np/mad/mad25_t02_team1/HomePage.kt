@@ -67,6 +67,9 @@ fun HomePageScaffold() {
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
 
     Scaffold(
+        topBar = {
+            TicketLahHeader()   // ⭐ FIXED HEADER — same as Login page
+        },
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
@@ -74,11 +77,20 @@ fun HomePageScaffold() {
             )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(
+            modifier = Modifier
+                .padding(
+                    top = innerPadding.calculateTopPadding() + 16.dp,
+                    bottom = innerPadding.calculateBottomPadding(),
+                    start = 16.dp,
+                    end = 16.dp
+                )
+        ) {
             HomePageContent()
         }
     }
 }
+
 
 // ----------------------------
 // PAGE CONTENT

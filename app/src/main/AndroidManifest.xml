@@ -31,6 +31,10 @@
             android:name=".HomePage"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
+        <activity
+            android:name=".BookingHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
     </application>
 
 </manifest>

@@ -26,7 +26,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.IgnoreExtraProperties
 import com.google.firebase.firestore.PropertyName
 import com.google.firebase.storage.FirebaseStorage
+import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
+import androidx.navigation.NavGraph.Companion.findStartDestination
 
 // ----------------------------
 // DATA CLASS
@@ -68,7 +70,7 @@ class HomePage : ComponentActivity() {
 fun HomePageScaffold() {
 
     val navController = rememberNavController()
-    var selectedTab by remember { mutableStateOf(BottomNavItem.Home) }
+    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
 
     Scaffold(
         topBar = { TicketLahHeader() },
@@ -76,10 +78,19 @@ fun HomePageScaffold() {
             BottomNavigationBar(
                 selectedItem = selectedTab,
                 onItemSelected = { item ->
-                    selectedTab = item as BottomNavItem.Home
+                    selectedTab = item
                     navController.navigate(item.route) {
+                        // Pop up to the start destination of the graph to
+                        // avoid building up a large stack of destinations
+                        // on the back stack as users select items
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        // Avoid multiple copies of the same destination when
+                        // re-selecting the same item
                         launchSingleTop = true
-                        popUpTo(navController.graph.startDestinationId)
+                        // Restore state when re-selecting a previously selected item
+                        restoreState = true
                     }
                 }
             )
@@ -93,7 +104,7 @@ fun HomePageScaffold() {
         ) {
             composable(BottomNavItem.Home.route) { HomePageContent() }
             composable(BottomNavItem.Search.route) {  }
-            composable(BottomNavItem.Tickets.route) {  }
+            composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
             composable(BottomNavItem.Profile.route) {  }
         }
     }
@@ -110,18 +121,24 @@ fun HomePageContent() {
     var upcomingEvents by remember { mutableStateOf(listOf<Event>()) }
     var availableEvents by remember { mutableStateOf(listOf<Event>()) }
 
-    LaunchedEffect(true) {
-        FirebaseFirestore.getInstance()
+    DisposableEffect(Unit) {
+        val listener = FirebaseFirestore.getInstance()
             .collection("Events")
-            .get()
-            .addOnSuccessListener { result ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val allEvents = snapshot.documents.mapNotNull { it.toObject(Event::class.java) }
+                    val sorted = allEvents.sortedBy { it.Date }
 
-                val allEvents = result.documents.mapNotNull { it.toObject(Event::class.java) }
-                val sorted = allEvents.sortedBy { it.Date }
-
-                upcomingEvents = sorted.take(3)
-                availableEvents = sorted
+                    upcomingEvents = sorted.take(3)
+                    availableEvents = sorted
+                }
             }
+        onDispose {
+            listener.remove()
+        }
     }
 
     Column(
@@ -169,25 +186,6 @@ fun HomePageContent() {
     }
 }
 
-// ----------------------------
-// HELPER: Convert gs:// to https
-// ----------------------------
-@Composable
-fun getImageUrl(gsUrl: String): String {
-    var httpUrl by remember { mutableStateOf("") }
-
-    val cleaned = gsUrl.trim()
-
-    if (cleaned.startsWith("gs://")) {
-        val ref = FirebaseStorage.getInstance().getReferenceFromUrl(cleaned)
-        ref.downloadUrl.addOnSuccessListener { url ->
-            httpUrl = url.toString()
-        }
-    } else {
-        httpUrl = cleaned
-    }
-    return httpUrl
-}
 
 // ----------------------------
 // UPCOMING EVENT CARD
@@ -195,7 +193,21 @@ fun getImageUrl(gsUrl: String): String {
 @Composable
 fun UpcomingEventCard(event: Event) {
 
-    val imageUrl = getImageUrl(event.EventImage)
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(event.EventImage) {
+        val gsUrl = event.EventImage.trim()
+        if (gsUrl.startsWith("gs://")) {
+            val ref = FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl)
+            ref.downloadUrl.addOnSuccessListener { url ->
+                imageUrl = url.toString()
+            }.addOnFailureListener {
+                imageUrl = null // Handle error
+            }
+        } else {
+            imageUrl = gsUrl
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(10.dp),
@@ -206,9 +218,8 @@ fun UpcomingEventCard(event: Event) {
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column {
-
             Image(
-                painter = rememberAsyncImagePainter(imageUrl),
+                painter = rememberAsyncImagePainter(imageUrl ?: R.drawable.ticket), // Fallback to a placeholder
                 contentDescription = event.Name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -232,7 +243,21 @@ fun UpcomingEventCard(event: Event) {
 @Composable
 fun AvailableEventCard(event: Event) {
 
-    val imageUrl = getImageUrl(event.EventImage)
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(event.EventImage) {
+        val gsUrl = event.EventImage.trim()
+        if (gsUrl.startsWith("gs://")) {
+            val ref = FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl)
+            ref.downloadUrl.addOnSuccessListener { url ->
+                imageUrl = url.toString()
+            }.addOnFailureListener {
+                imageUrl = null // Handle error
+            }
+        } else {
+            imageUrl = gsUrl
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(10.dp),
@@ -245,7 +270,7 @@ fun AvailableEventCard(event: Event) {
         Column {
 
             Image(
-                painter = rememberAsyncImagePainter(imageUrl),
+                painter = rememberAsyncImagePainter(imageUrl ?: R.drawable.ticket), // Fallback to a placeholder
                 contentDescription = event.Name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

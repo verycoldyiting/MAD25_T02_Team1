@@ -42,6 +42,7 @@ import sg.edu.np.mad.mad25_t02_team1.models.Event
 import java.text.SimpleDateFormat
 import java.util.*
 import com.google.android.gms.tasks.Task
+import sg.edu.np.mad.mad25_t02_team1.ExploreEventsApp
 
 
 // NOTE: Ensure your BottomNavigationBar/BottomNavItem are defined correctly
@@ -85,7 +86,7 @@ fun BookingHistoryScaffold() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) { HomePageContent() }
-            composable(BottomNavItem.Search.route) { Text("Search Screen") }
+            composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
             composable(BottomNavItem.Profile.route) { Text("Profile Screen") }
         }

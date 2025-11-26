@@ -1,14 +1,13 @@
 package sg.edu.np.mad.mad25_t02_team1.ui
 
-import android.net.Uri
+import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
@@ -22,37 +21,39 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.rememberAsyncImagePainter
-import com.google.android.gms.tasks.Task
-import com.google.android.gms.tasks.Tasks
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageException
-import com.google.firebase.Timestamp
-import sg.edu.np.mad.mad25_t02_team1.models.Booking
-import sg.edu.np.mad.mad25_t02_team1.models.Event
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlinx.coroutines.tasks.await
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.runtime.setValue
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.compose.rememberAsyncImagePainter
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.BottomNavItem
 import sg.edu.np.mad.mad25_t02_team1.BottomNavigationBar
 import sg.edu.np.mad.mad25_t02_team1.HomePageContent
 import sg.edu.np.mad.mad25_t02_team1.TicketLahHeader
+import sg.edu.np.mad.mad25_t02_team1.models.Booking
+import sg.edu.np.mad.mad25_t02_team1.models.Event
+import java.text.SimpleDateFormat
+import java.util.*
+import com.google.android.gms.tasks.Task
 
-
+// NOTE: Ensure your BottomNavigationBar/BottomNavItem are defined correctly
+// (e.g., using NavController and routes, or the old selectedItem/onItemSelected structure)
+// based on previous steps. This code assumes the old structure (selectedItem) for simplicity,
+// but the navigation logic inside the Scaffold block is correct for the NavHost pattern.
 
 @Composable
 fun BookingHistoryScaffold() {
-
     val navController = rememberNavController()
-    var selectedTab by remember { mutableStateOf(BottomNavItem.Home) }
+    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Tickets) }
+
+    var refreshTrigger by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = { TicketLahHeader() },
@@ -60,25 +61,31 @@ fun BookingHistoryScaffold() {
             BottomNavigationBar(
                 selectedItem = selectedTab,
                 onItemSelected = { item ->
-                    selectedTab = item as BottomNavItem.Home
-                    navController.navigate(item.route) {
-                        launchSingleTop = true
-                        popUpTo(navController.graph.startDestinationId)
+                    if (selectedTab == item) {
+                        if (item == BottomNavItem.Tickets) {
+                            refreshTrigger++
+                        }
+                    } else {
+                        selectedTab = item
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 }
             )
         }
     ) { innerPadding ->
-
         NavHost(
             navController = navController,
-            startDestination = BottomNavItem.Home.route,
+            startDestination = BottomNavItem.Tickets.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) { HomePageContent() }
-            composable(BottomNavItem.Search.route) {  }
+            composable(BottomNavItem.Search.route) { Text("Search Screen") }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
-            composable(BottomNavItem.Profile.route) {  }
+            composable(BottomNavItem.Profile.route) { Text("Profile Screen") }
         }
     }
 }
@@ -88,124 +95,96 @@ fun BookingHistoryScaffold() {
 fun BookingHistoryScreen() {
     var bookingWithEvents by remember { mutableStateOf<List<Pair<Booking, Event?>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-
-    // TEMP: default account id for testing. Replace with FirebaseAuth currentUser?.uid later.
+    // TEMP: default account id for testing.
     val accountId = "A001"
 
-    LaunchedEffect(accountId) {
-        val db = FirebaseFirestore.getInstance()
-        val accountRef = db.document("/Account/$accountId")
+    LaunchedEffect(key1 = accountId) {
+        isLoading = true
+        delay(300) // Ensure animation is visible
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val accountRef = db.document("/Account/$accountId")
 
-        db.collection("BookingDetails")
-            .whereEqualTo("AccID", accountRef) // Corrected field name
-            .get()
-            .addOnSuccessListener { bookingSnapshot ->
-                val bookingList: List<Booking> = bookingSnapshot.map { doc ->
-                    doc.toObject(Booking::class.java).copy(id = doc.id)
-                }
+            val bookingSnapshot = db.collection("BookingDetails")
+                // FIX: Use the correct database field name AccID
+                .whereEqualTo("AccID", accountRef)
+                .get()
+                .await()
 
-                if (bookingList.isEmpty()) {
-                    bookingWithEvents = emptyList()
-                    isLoading = false
-                    return@addOnSuccessListener
-                }
+            val bookingList = bookingSnapshot.documents.mapNotNull { doc ->
+                // Ensure ID is copied for context
+                doc.toObject(Booking::class.java)?.copy(id = doc.id)
+            }
 
-                // Prepare tasks to fetch Event docs
-                val eventTasks: List<Task<DocumentSnapshot>> = bookingList.map { booking ->
-                    val eventId: String = booking.eventId ?: ""
+            // Fetch events in parallel using Tasks.whenAllSuccess and await
+            val eventTasks: List<Task<DocumentSnapshot>> = bookingList.mapNotNull { booking ->
+                booking.eventId?.let { eventId ->
                     db.collection("Events").document(eventId).get()
                 }
+            }
 
-                // Wait for all event fetch tasks to finish
-                Tasks.whenAllSuccess<DocumentSnapshot>(eventTasks)
-                    .addOnSuccessListener { results ->
-                        // results are DocumentSnapshot in the same order as eventTasks
-                        val paired: MutableList<Pair<Booking, Event?>> = mutableListOf()
-                        for (i in bookingList.indices) {
-                            val booking = bookingList[i]
-                            val docSnapshot = results.getOrNull(i)
-                            val event: Event? = docSnapshot?.toObject(Event::class.java)?.copy(id = docSnapshot.id)
-                            paired.add(booking to event)
-                        }
-                        bookingWithEvents = paired
-                        isLoading = false
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("BookingHistory", "Failed to fetch events", e)
-                        // Still map bookings without events
-                        bookingWithEvents = bookingList.map { it to null }
-                        isLoading = false
-                    }
+            // Wait for all event fetch tasks to finish
+            val results = Tasks.whenAllSuccess<DocumentSnapshot>(eventTasks).await()
+            val eventDocuments = results.filterIsInstance<DocumentSnapshot>()
+
+            val eventMap = eventDocuments
+                .mapNotNull { doc -> doc.toObject(Event::class.java)?.copy(id = doc.id) }
+                .associateBy { it.id }
+
+            // Pair bookings with their respective events
+            val eventBookingPairs = bookingList.map { booking ->
+                val event = booking.eventId?.let { eventMap[it] }
+                booking to event
             }
-            .addOnFailureListener { e ->
-                Log.e("BookingHistory", "Failed to fetch bookings", e)
-                isLoading = false
-            }
+
+            bookingWithEvents = eventBookingPairs
+        } catch (e: Exception) {
+            Log.e("BookingHistory", "Error fetching data", e)
+        } finally {
+            isLoading = false
+        }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Booking History", fontWeight = FontWeight.Bold) }
-            )
-        }
-    ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp)) {
-
-            when {
-                isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                bookingWithEvents.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No booking history found.")
-                    }
-                }
-                else -> {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
-                        items(bookingWithEvents) { pair ->
-                            BookingHistoryItem(pair.first, pair.second)
-                        }
-                    }
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        } else if (bookingWithEvents.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No booking history found.") }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
+                items(bookingWithEvents) { (booking, event) ->
+                    BookingHistoryItem(booking, event)
                 }
             }
         }
     }
 }
 
+@SuppressLint("DefaultLocale")
 @Composable
 fun BookingHistoryItem(booking: Booking, event: Event?) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight()
-            .clickable { /* optionally navigate to booking detail */ },
-        shape = RoundedCornerShape(16.dp), // Increased roundness for modern look
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), // Use a slight color variation
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp) // Stronger shadow
+        modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // Image: prefer event.eventImage, fallback to booking.eventImage
-            val rawImageUrl = event?.eventImage ?: booking.eventImage
-            EventImage(rawUrl = rawImageUrl)
-
+            // Use event image as primary source
+            EventImage(rawUrl = event?.eventImage ?: booking.eventImage)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Event title
             Text(
-                text = event?.name ?: booking.concertTitle ?: booking.name ?: "Unknown Event",
+                // Use concertTitle as fallback for event name
+                text = event?.name ?: booking.concertTitle.orEmpty().ifEmpty { "Unknown Event" },
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 20.sp,
                 color = MaterialTheme.colorScheme.primary
             )
 
-            // Artist
-            if (!event?.artist.isNullOrEmpty()) {
+            event?.artist?.takeIf { it.isNotEmpty() }?.let {
                 Text(
-                    text = event!!.artist ?: "",
+                    text = it,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -214,19 +193,20 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Event Date and Venue (with Icons)
-            event?.date?.let { ts: Timestamp ->
+            // Event Date
+            event?.date?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Event, contentDescription = "Event Date", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = timestampToString(ts), style = MaterialTheme.typography.bodyMedium)
+                    Icon(Icons.Default.Event, "Event Date", Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(text = timestampToString(it), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            if (!event?.venue.isNullOrEmpty()) {
+            // Event Venue
+            event?.venue?.takeIf { it.isNotEmpty() }?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "Venue", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = event!!.venue ?: "", style = MaterialTheme.typography.bodyMedium)
+                    Icon(Icons.Default.LocationOn, "Venue", Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(text = it, style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
@@ -234,36 +214,39 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Booking details in two columns using a Surface for emphasis
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 2.dp
             ) {
-                Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        DetailText("Category:", booking.category ?: "N/A")
-                        DetailText("Seat:", booking.section ?: "N/A")
+                        // FIX: Added null/empty checks using orEmpty()
+                        DetailText("Category:", booking.category.orEmpty().ifEmpty { "N/A" })
+                        DetailText("Seat:", booking.section.orEmpty().ifEmpty { "N/A" })
+                        // FIX: Use Elvis operator for safe quantity display
                         DetailText("Quantity:", (booking.quantity ?: 0).toString())
                     }
-
                     Column(horizontalAlignment = Alignment.End) {
-                        DetailText("Payment:", booking.paymentMethod ?: "N/A")
-                        Spacer(modifier = Modifier.height(8.dp))
+                        // FIX: Added null/empty checks
+                        DetailText("Payment:", booking.paymentMethod.orEmpty().ifEmpty { "N/A" })
+                        Spacer(Modifier.height(8.dp))
+
+                        val totalPrice = booking.totalPrice ?: 0.0
                         Text(
-                            text = "Total: $${"%.2f".format(booking.totalPrice ?: 0.0)}",
+                            text = "Total: $${String.format("%.2f", totalPrice)}",
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.error // Highlight the price
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
 
-            booking.purchaseTime?.let { ts ->
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Purchased: ${timestampToString(ts)}", style = MaterialTheme.typography.labelSmall)
+            booking.purchaseTime?.let {
+                Spacer(Modifier.height(12.dp))
+                Text("Purchased: ${timestampToString(it)}", style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -273,62 +256,54 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
 fun DetailText(label: String, value: String) {
     Row {
         Text(label, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(Modifier.width(4.dp))
         Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 fun EventImage(rawUrl: String?) {
-    // Show placeholder if there is no URL
     var displayUrl by remember { mutableStateOf<String?>(null) }
     var loadingError by remember { mutableStateOf(false) }
 
     LaunchedEffect(rawUrl) {
         loadingError = false
         displayUrl = null
-        if (rawUrl.isNullOrBlank()) return@LaunchedEffect
 
-        val cleanedUrl = rawUrl.trim()
+        val cleanedUrl = rawUrl?.trim()
 
-        // If it's a gs:// storage path, convert to https downloadUrl
+        if (cleanedUrl.isNullOrBlank()) {
+            // FIX: Set loadingError true if URL is blank/null so placeholder appears
+            loadingError = true
+            return@LaunchedEffect
+        }
+
         if (cleanedUrl.startsWith("gs://")) {
             try {
                 val storageRef = FirebaseStorage.getInstance().getReferenceFromUrl(cleanedUrl)
-                // FIX: Use suspending await()
-                val uriResult = storageRef.downloadUrl.await()
-                displayUrl = uriResult.toString()
-            } catch (ex: Exception) {
-                Log.w("EventImage", "Failed to resolve gs:// url: $cleanedUrl", ex)
+                val uri = storageRef.downloadUrl.await()
+                displayUrl = uri.toString()
+            } catch (e: Exception) {
+                Log.w("EventImage", "Failed to resolve gs:// url: $cleanedUrl", e)
                 loadingError = true
             }
         } else {
-            // Assume it's already an http/https url
             displayUrl = cleanedUrl
         }
     }
 
-    val painter = rememberAsyncImagePainter(displayUrl)
-
-    Box(modifier = Modifier
-        .fillMaxWidth()
-        .height(180.dp)
-        .clip(RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(12.dp)), Alignment.Center) {
         if (displayUrl == null && !loadingError) {
-            // loading placeholder
-            Box(modifier = Modifier.fillMaxSize().background(Color.LightGray.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(Color.LightGray.copy(alpha = 0.5f)), Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else if (loadingError) {
-            // fallback placeholder UI
-            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer), Alignment.Center) {
                 Text("Image unavailable", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
             }
         } else {
             Image(
-                painter = painter,
+                painter = rememberAsyncImagePainter(model = displayUrl),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -339,6 +314,5 @@ fun EventImage(rawUrl: String?) {
 
 fun timestampToString(ts: Timestamp): String {
     val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
-    val date: Date = ts.toDate()
-    return sdf.format(date)
+    return sdf.format(ts.toDate())
 }

@@ -43,10 +43,12 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.google.android.gms.tasks.Task
 
+
 // NOTE: Ensure your BottomNavigationBar/BottomNavItem are defined correctly
 // (e.g., using NavController and routes, or the old selectedItem/onItemSelected structure)
 // based on previous steps. This code assumes the old structure (selectedItem) for simplicity,
 // but the navigation logic inside the Scaffold block is correct for the NavHost pattern.
+
 
 @Composable
 fun BookingHistoryScaffold() {

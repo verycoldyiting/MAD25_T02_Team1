@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.IgnoreExtraProperties
@@ -29,6 +29,11 @@ import com.google.firebase.storage.FirebaseStorage
 import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import coil.request.ImageRequest
+import kotlinx.coroutines.tasks.await
 
 // ----------------------------
 // DATA CLASS
@@ -80,16 +85,10 @@ fun HomePageScaffold() {
                 onItemSelected = { item ->
                     selectedTab = item
                     navController.navigate(item.route) {
-                        // Pop up to the start destination of the graph to
-                        // avoid building up a large stack of destinations
-                        // on the back stack as users select items
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
-                        // Avoid multiple copies of the same destination when
-                        // re-selecting the same item
                         launchSingleTop = true
-                        // Restore state when re-selecting a previously selected item
                         restoreState = true
                     }
                 }
@@ -194,19 +193,21 @@ fun HomePageContent() {
 fun UpcomingEventCard(event: Event) {
 
     var imageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(event.EventImage) {
+        isLoading = true
         val gsUrl = event.EventImage.trim()
-        if (gsUrl.startsWith("gs://")) {
-            val ref = FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl)
-            ref.downloadUrl.addOnSuccessListener { url ->
-                imageUrl = url.toString()
-            }.addOnFailureListener {
-                imageUrl = null // Handle error
+        imageUrl = if (gsUrl.startsWith("gs://")) {
+            try {
+                FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl).downloadUrl.await().toString()
+            } catch (e: Exception) {
+                null
             }
         } else {
-            imageUrl = gsUrl
+            gsUrl
         }
+        isLoading = false
     }
 
     Card(
@@ -218,14 +219,29 @@ fun UpcomingEventCard(event: Event) {
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column {
-            Image(
-                painter = rememberAsyncImagePainter(imageUrl ?: R.drawable.ticket), // Fallback to a placeholder
-                contentDescription = event.Name,
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .height(150.dp)
-                    .fillMaxWidth()
-            )
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator()
+                } else if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = event.Name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Optional: Show a placeholder if loading fails or URL is empty
+                    Image(painter = painterResource(id = R.drawable.ic_launcher_background), contentDescription = "Error")
+                }
+            }
 
             Text(
                 text = event.Name.ifEmpty { "Event Name" },
@@ -244,19 +260,21 @@ fun UpcomingEventCard(event: Event) {
 fun AvailableEventCard(event: Event) {
 
     var imageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(event.EventImage) {
+        isLoading = true
         val gsUrl = event.EventImage.trim()
-        if (gsUrl.startsWith("gs://")) {
-            val ref = FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl)
-            ref.downloadUrl.addOnSuccessListener { url ->
-                imageUrl = url.toString()
-            }.addOnFailureListener {
-                imageUrl = null // Handle error
+        imageUrl = if (gsUrl.startsWith("gs://")) {
+            try {
+                FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl).downloadUrl.await().toString()
+            } catch (e: Exception) {
+                null
             }
         } else {
-            imageUrl = gsUrl
+            gsUrl
         }
+        isLoading = false
     }
 
     Card(
@@ -268,15 +286,28 @@ fun AvailableEventCard(event: Event) {
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column {
-
-            Image(
-                painter = rememberAsyncImagePainter(imageUrl ?: R.drawable.ticket), // Fallback to a placeholder
-                contentDescription = event.Name,
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .height(180.dp)
-                    .fillMaxWidth()
-            )
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator()
+                } else if (!imageUrl.isNullOrEmpty()){
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = event.Name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Image(painter = painterResource(id = R.drawable.ic_launcher_background), contentDescription = "Error")
+                }
+            }
 
             Text(
                 text = event.Caption.ifEmpty { "Event Name" },

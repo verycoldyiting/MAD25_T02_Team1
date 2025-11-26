@@ -102,7 +102,7 @@ fun HomePageScaffold() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) { HomePageContent() }
-            composable(BottomNavItem.Search.route) {  }
+            composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
             composable(BottomNavItem.Profile.route) {  }
         }

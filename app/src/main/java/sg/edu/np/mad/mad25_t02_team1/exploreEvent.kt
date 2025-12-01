@@ -1,10 +1,12 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,15 +34,13 @@ import coil.request.ImageRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
-import sg.edu.np.mad.mad25_t02_team1.models.Event // FIXED: Import the correct Event model
+import sg.edu.np.mad.mad25_t02_team1.models.Event
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
-
-// --- REMOVED THE LOCAL, INCORRECT DATA MODEL ---
 
 class ExploreEventActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,21 +55,17 @@ class ExploreEventActivity : ComponentActivity() {
 
 @Composable
 fun ExploreEventsScaffold() {
-    // 1. Setup NavController
     val navController = rememberNavController()
-    // 2. Initial selected tab is Search (as this is the Explore screen)
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Search) }
 
     Scaffold(
-        topBar = { TicketLahHeader() }, // Top Bar
+        topBar = { TicketLahHeader() },
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
                 onItemSelected = { item ->
                     selectedTab = item
-                    // Navigation logic to switch tabs
                     navController.navigate(item.route) {
-                        // Avoid building up large back stacks when switching tabs
                         popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                         launchSingleTop = true
                         restoreState = true
@@ -79,30 +75,24 @@ fun ExploreEventsScaffold() {
         },
         containerColor = Color.White
     ) { innerPadding ->
-        // 3. NavHost handles screen switching
         NavHost(
             navController = navController,
-            startDestination = BottomNavItem.Search.route, // Start on the search screen
-            modifier = Modifier.padding(innerPadding) // Apply padding from bars
+            startDestination = BottomNavItem.Search.route,
+            modifier = Modifier.padding(innerPadding)
         ) {
-            // Define all navigation destinations
             composable(BottomNavItem.Home.route) {
-                // Placeholder content for the Home route
                 HomePageContent()
             }
 
             composable(BottomNavItem.Search.route) {
-                // The main content of this file
                 ExploreEventsApp()
             }
 
             composable(BottomNavItem.Tickets.route) {
-                // Placeholder content for the Tickets route
                 BookingHistoryScreen()
             }
 
             composable(BottomNavItem.Profile.route) {
-                // Placeholder content for the Profile route
                 Text("Profile Screen Placeholder")
             }
         }
@@ -117,6 +107,7 @@ fun ExploreEventsApp() {
     var availableGenres by remember { mutableStateOf<List<String>>(emptyList()) }
 
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         try {
@@ -177,7 +168,14 @@ fun ExploreEventsApp() {
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(displayedEvents, key = { it.id }) { event ->
-                    EventCard(event)
+                    EventCard(
+                        event = event,
+                        onClick = {
+                            val intent = Intent(context, EventDetailsActivity::class.java)
+                            intent.putExtra("EVENT_ID", event.id)
+                            context.startActivity(intent)
+                        }
+                    )
                 }
             }
         }
@@ -259,7 +257,10 @@ fun SearchBarWithFilter(
 }
 
 @Composable
-fun EventCard(event: Event) {
+fun EventCard(
+    event: Event,
+    onClick: () -> Unit
+) {
     var finalImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoadingImage by remember { mutableStateOf(true) }
 
@@ -285,14 +286,20 @@ fun EventCard(event: Event) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().height(220.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column {
             Box(
-                modifier = Modifier.weight(1f).fillMaxWidth().background(Color.LightGray),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLoadingImage) {
@@ -314,11 +321,13 @@ fun EventCard(event: Event) {
                 if (event.genre?.isNotEmpty() == true) {
                     Surface(
                         color = Color.Black.copy(alpha = 0.7f),
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = event.genre.orEmpty().uppercase(), // FIXED
+                            text = event.genre.orEmpty().uppercase(),
                             color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -328,7 +337,9 @@ fun EventCard(event: Event) {
                 }
             }
 
-            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)) {
                 Text(
                     text = event.name.orEmpty(),
                     fontSize = 16.sp,

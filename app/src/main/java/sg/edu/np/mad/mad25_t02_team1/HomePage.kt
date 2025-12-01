@@ -1,9 +1,11 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -36,7 +38,7 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 
 // ----------------------------
-// DATA CLASS
+// DATA CLASS (Keep for compatibility)
 // ----------------------------
 @IgnoreExtraProperties
 data class Event(
@@ -51,7 +53,9 @@ data class Event(
     var EventImage: String = "",
 
     @get:PropertyName("Date") @set:PropertyName("Date")
-    var Date: Timestamp? = null
+    var Date: Timestamp? = null,
+
+    var id: String = ""
 )
 
 // ----------------------------
@@ -109,8 +113,6 @@ fun HomePageScaffold() {
     }
 }
 
-
-
 // ----------------------------
 // PAGE CONTENT
 // ----------------------------
@@ -119,6 +121,7 @@ fun HomePageContent() {
 
     var upcomingEvents by remember { mutableStateOf(listOf<Event>()) }
     var availableEvents by remember { mutableStateOf(listOf<Event>()) }
+    val context = LocalContext.current
 
     DisposableEffect(Unit) {
         val listener = FirebaseFirestore.getInstance()
@@ -128,7 +131,9 @@ fun HomePageContent() {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val allEvents = snapshot.documents.mapNotNull { it.toObject(Event::class.java) }
+                    val allEvents = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(Event::class.java)?.copy(id = doc.id)
+                    }
                     val sorted = allEvents.sortedBy { it.Date }
 
                     upcomingEvents = sorted.take(3)
@@ -158,7 +163,14 @@ fun HomePageContent() {
         if (upcomingEvents.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(upcomingEvents) { event ->
-                    UpcomingEventCard(event)
+                    UpcomingEventCard(
+                        event = event,
+                        onClick = {
+                            val intent = Intent(context, EventDetailsActivity::class.java)
+                            intent.putExtra("EVENT_ID", event.id)
+                            context.startActivity(intent)
+                        }
+                    )
                 }
             }
         } else {
@@ -179,18 +191,27 @@ fun HomePageContent() {
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             items(availableEvents) { event ->
-                AvailableEventCard(event)
+                AvailableEventCard(
+                    event = event,
+                    onClick = {
+                        val intent = Intent(context, EventDetailsActivity::class.java)
+                        intent.putExtra("EVENT_ID", event.id)
+                        context.startActivity(intent)
+                    }
+                )
             }
         }
     }
 }
 
-
 // ----------------------------
 // UPCOMING EVENT CARD
 // ----------------------------
 @Composable
-fun UpcomingEventCard(event: Event) {
+fun UpcomingEventCard(
+    event: Event,
+    onClick: () -> Unit
+) {
 
     var imageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -214,7 +235,8 @@ fun UpcomingEventCard(event: Event) {
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier
             .width(160.dp)
-            .height(220.dp),
+            .height(220.dp)
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
@@ -238,7 +260,6 @@ fun UpcomingEventCard(event: Event) {
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Optional: Show a placeholder if loading fails or URL is empty
                     Image(painter = painterResource(id = R.drawable.ic_launcher_background), contentDescription = "Error")
                 }
             }
@@ -257,7 +278,10 @@ fun UpcomingEventCard(event: Event) {
 // AVAILABLE EVENT CARD
 // ----------------------------
 @Composable
-fun AvailableEventCard(event: Event) {
+fun AvailableEventCard(
+    event: Event,
+    onClick: () -> Unit
+) {
 
     var imageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -281,7 +305,8 @@ fun AvailableEventCard(event: Event) {
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(250.dp),
+            .height(250.dp)
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {

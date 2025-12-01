@@ -51,7 +51,6 @@ class EventDetailsActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventDetailsScreen(
     eventId: String,
@@ -99,44 +98,58 @@ fun EventDetailsScreen(
         isLoadingImage = false
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "🎟️ TicketLah!",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackPressed) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF2196F3)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F5))
+    ) {
+        // Custom Header with Back Button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(85.dp)
+                .background(Color(0xFF00A2FF))
+        ) {
+            // Back Button
+            IconButton(
+                onClick = onBackPressed,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
                 )
-            )
-        },
-        containerColor = Color(0xFFF5F5F5)
-    ) { innerPadding ->
+            }
+
+            // Center Logo and Title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                AsyncImage(
+                    model = "https://firebasestorage.googleapis.com/v0/b/mad25t02team1.firebasestorage.app/o/image-removebg-preview.png?alt=media&token=3b068498-aeb6-4491-8ab2-17c10f807a2d",
+                    contentDescription = "TicketLah Logo",
+                    modifier = Modifier.size(40.dp)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "TicketLah!",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            }
+        }
+
+        // Content Area
         if (isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -145,14 +158,11 @@ fun EventDetailsScreen(
             EventDetailsContent(
                 event = event!!,
                 imageUrl = imageUrl,
-                isLoadingImage = isLoadingImage,
-                modifier = Modifier.padding(innerPadding)
+                isLoadingImage = isLoadingImage
             )
         } else {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

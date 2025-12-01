@@ -43,6 +43,10 @@
             android:name=".ExploreEventActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
+        <activity
+            android:name=".EventDetailsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
     </application>
 
 </manifest>

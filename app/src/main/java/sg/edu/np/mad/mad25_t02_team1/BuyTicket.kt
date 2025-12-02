@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -24,85 +25,52 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.SeatCategory
 import sg.edu.np.mad.mad25_t02_team1.models.Event
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.util.Locale
 
-// --- STABLE CUSTOM TOP BAR (Matches EventDetails Look and Go-Back Functionality) ---
-@Composable
-fun StableCustomAppBar(onBackPressed: () -> Unit) {
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .background(Color(0xFF00A2FF)) // Blue Color
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Back Button
-        IconButton(onClick = onBackPressed) { // Executes Activity.finish()
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack, // Stable RTL icon
-                contentDescription = "Back",
-                tint = Color.White
-            )
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        // No title text, as requested, allowing the bar to remain empty/minimal
-        Spacer(modifier = Modifier.weight(1f))
-    }
-}
-
-
-// --- MAIN SCREEN ---
 @Composable
 fun BuyTicketScreen(navController: NavController) {
+
     val activity = LocalContext.current as ComponentActivity
     val context = LocalContext.current
+
     val eventId = remember { activity.intent.getStringExtra("EVENT_ID") ?: "" }
 
-    // --- State Management ---
     var event by remember { mutableStateOf<Event?>(null) }
     var selectedCategory by remember { mutableStateOf<SeatCategory?>(null) }
     var selectedSectionId by remember { mutableStateOf<String?>(null) }
     var quantity by remember { mutableStateOf("1") }
+
     var imageUrl by remember { mutableStateOf<String?>(null) }
     var isLoadingImage by remember { mutableStateOf(true) }
+
     var allSeatCategories by remember { mutableStateOf<List<SeatCategory>>(emptyList()) }
     var isLoadingCategories by remember { mutableStateOf(true) }
 
-    // --- Dropdown Menu State ---
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showSectionMenu by remember { mutableStateOf(false) }
     var showQuantityMenu by remember { mutableStateOf(false) }
 
-    // --- Data Fetching ---
+    // -------- FETCH FIREBASE DATA --------
     LaunchedEffect(eventId) {
         val db = FirebaseFirestore.getInstance()
 
-        // Fetch Event Details
         try {
-            val document = db.collection("Events").document(eventId).get().await()
-            event = document.toObject(Event::class.java)
-        } catch (e: Exception) { /* Log error */ }
+            val doc = db.collection("Events").document(eventId).get().await()
+            event = doc.toObject(Event::class.java)
+        } catch (_: Exception) {}
 
-        // Fetch Image URL & Categories
-        isLoadingImage = true
-        isLoadingCategories = true
         try {
-            val storageRef = FirebaseStorage.getInstance().reference.child("seating_plan.png")
-            imageUrl = storageRef.downloadUrl.await().toString()
+            val ref = FirebaseStorage.getInstance().reference.child("seating_plan.png")
+            imageUrl = ref.downloadUrl.await().toString()
 
             val snapshot = db.collection("SeatCategory").get().await()
-            allSeatCategories = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(SeatCategory::class.java)
-            }
-        } catch (e: Exception) { imageUrl = null }
-        finally {
+            allSeatCategories = snapshot.documents.mapNotNull { it.toObject(SeatCategory::class.java) }
+
+        } catch (_: Exception) {
+            imageUrl = null
+        } finally {
             isLoadingImage = false
             isLoadingCategories = false
         }
@@ -110,35 +78,79 @@ fun BuyTicketScreen(navController: NavController) {
 
     val totalPrice = (selectedCategory?.price ?: 0.0) * (quantity.toIntOrNull() ?: 0)
 
+    // -------- UI --------
     Scaffold(
-        topBar = { StableCustomAppBar(onBackPressed = { activity.finish() }) },
+
+        topBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+            ) {
+                TicketLahHeader()
+                var onBackPressed = { finish() }
+                // Beautiful Back Button
+                IconButton(
+                    onClick = onBackPressed,
+                    modifier = Modifier
+                        .padding(start = 10.dp, top = 20.dp)
+                        .size(60.dp)
+                        .align(Alignment.TopStart)
+                ) {
+
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(24.dp)
+                    )
+
+                }
+            }
+        },
+
         bottomBar = {
             if (totalPrice > 0) {
-                Surface(modifier = Modifier.fillMaxWidth(), shadowElevation = 8.dp) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 8.dp
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Total Price Display
                         Column {
                             Text("TOTAL PRICE", style = MaterialTheme.typography.labelSmall)
-                            Text("S$ ${String.format(Locale.getDefault(), "%.2f", totalPrice)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(
+                                "S$ ${String.format(Locale.getDefault(), "%.2f", totalPrice)}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
-                        // Booking/Payment Button
                         Button(
+                            enabled = selectedCategory != null && selectedSectionId != null,
                             onClick = {
-                                val intent = Intent(context, PaymentDetailActivity::class.java).apply {
-                                    putExtra("EVENT_ID", eventId)
-                                    putExtra("CATEGORY_NAME", selectedCategory?.category)
-                                    putExtra("SECTION_ID", selectedSectionId)
-                                    putExtra("QUANTITY", quantity.toIntOrNull() ?: 0)
+
+                                val intent = Intent(context, PaymentPage::class.java).apply {
+                                    putExtra("eventId", eventId)
+                                    putExtra("title", event?.name ?: "")
+                                    putExtra("artist", event?.artist ?: "")
+                                    putExtra("dateMillis", event?.date?.toDate()?.time ?: 0L)
+                                    putExtra("venue", event?.venue ?: "")
+                                    putExtra("category", selectedCategory?.category)
+                                    putExtra("section", selectedSectionId)
+                                    putExtra("quantity", quantity.toIntOrNull() ?: 1)
+                                    putExtra("pricePerTicket", selectedCategory?.price ?: 0.0)
                                     putExtra("TOTAL_PRICE", totalPrice)
                                 }
+
                                 context.startActivity(intent)
-                            },
-                            enabled = selectedCategory != null && selectedSectionId != null && quantity.toIntOrNull() in 1..4
+                            }
                         ) {
                             Text("Book Now")
                         }
@@ -147,7 +159,7 @@ fun BuyTicketScreen(navController: NavController) {
             }
         }
     ) { innerPadding ->
-        // Main scrollable content
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -156,120 +168,148 @@ fun BuyTicketScreen(navController: NavController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // --- 1. STATIC SEATING MAP IMAGE ---
-            if (isLoadingImage || isLoadingCategories) {
-                CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
+            // Seating Image
+            if (isLoadingImage) {
+                CircularProgressIndicator(modifier = Modifier.padding(16.dp))
             } else {
-                Box(
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = "Seating",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(Color.White)
-                        .padding(horizontal = 0.dp)
-                ) {
-                    if (imageUrl != null) {
-                        AsyncImage(model = imageUrl, contentDescription = "Seating Plan", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    } else {
-                        Text("Seating map unavailable.", Modifier.align(Alignment.Center))
-                    }
-                }
-            }
-
-            // --- 2. CONCERT TITLE DISPLAY (BELOW IMAGE) ---
-            if (event != null) {
-                Text(
-                    text = event!!.name ?: "Ticket Selection",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp).padding(horizontal = 16.dp)
+                        .aspectRatio(16f / 9f),
+                    contentScale = ContentScale.Fit
                 )
             }
 
-            // --- 3. INPUTS SECTION (Dropdowns) ---
+            if (event != null) {
+                Text(
+                    text = event!!.name ?: "",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(16.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // A. CATEGORY DROPDOWN
-                Box(modifier = Modifier.fillMaxWidth()) {
+                // -------- CATEGORY --------
+                Box(Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = selectedCategory?.category ?: "Select Category",
                         onValueChange = {},
-                        label = { Text("Category") },
                         readOnly = true,
+                        label = { Text("Category") },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Box(modifier = Modifier.matchParentSize().clickable(enabled = allSeatCategories.isNotEmpty()) { showCategoryMenu = true })
-                    DropdownMenu(expanded = showCategoryMenu, onDismissRequest = { showCategoryMenu = false }) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showCategoryMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showCategoryMenu,
+                        onDismissRequest = { showCategoryMenu = false }
+                    ) {
                         allSeatCategories.forEach { cat ->
-                            DropdownMenuItem(text = { Text(cat.category) }, onClick = {
-                                selectedCategory = cat
-                                selectedSectionId = null
-                                showCategoryMenu = false
-                            })
+                            DropdownMenuItem(
+                                text = { Text(cat.category) },
+                                onClick = {
+                                    selectedCategory = cat
+                                    selectedSectionId = null
+                                    showCategoryMenu = false
+                                }
+                            )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // B. PRICE DISPLAY (Read-Only)
+                Spacer(Modifier.height(16.dp))
+
+                // -------- PRICE --------
                 OutlinedTextField(
-                    value = selectedCategory?.price?.let { "S$ ${String.format("%.2f", it)}" } ?: "Price",
+                    value = selectedCategory?.price?.let { "S$ %.2f".format(it) } ?: "Price",
                     onValueChange = {},
-                    label = { Text("Price (Per Ticket)") },
                     readOnly = true,
+                    label = { Text("Price (Per Ticket)") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // C. SECTION DROPDOWN
-                Box(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.height(16.dp))
+
+                // -------- SECTION --------
+                Box(Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = selectedSectionId ?: "Select Section ID",
                         onValueChange = {},
-                        label = { Text("Section ID") },
                         readOnly = true,
+                        label = { Text("Section ID") },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Box(modifier = Modifier.matchParentSize().clickable(enabled = selectedCategory?.sections?.isNotEmpty() == true) { showSectionMenu = true })
-                    DropdownMenu(expanded = showSectionMenu, onDismissRequest = { showSectionMenu = false }) {
-                        selectedCategory?.sections?.forEach { section ->
-                            DropdownMenuItem(text = { Text(section) }, onClick = {
-                                selectedSectionId = section
-                                showSectionMenu = false
-                            })
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable(enabled = selectedCategory != null) { showSectionMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showSectionMenu,
+                        onDismissRequest = { showSectionMenu = false }
+                    ) {
+                        selectedCategory?.sections?.forEach { sec ->
+                            DropdownMenuItem(
+                                text = { Text(sec) },
+                                onClick = {
+                                    selectedSectionId = sec
+                                    showSectionMenu = false
+                                }
+                            )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // D. QUANTITY DROPDOWN (1-4)
-                Box(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.height(16.dp))
+
+                // -------- QUANTITY --------
+                Box(Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = quantity,
                         onValueChange = {},
-                        label = { Text("Quantity") },
                         readOnly = true,
+                        label = { Text("Quantity") },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Box(modifier = Modifier.matchParentSize().clickable { showQuantityMenu = true })
-                    DropdownMenu(expanded = showQuantityMenu, onDismissRequest = { showQuantityMenu = false }) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showQuantityMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showQuantityMenu,
+                        onDismissRequest = { showQuantityMenu = false }
+                    ) {
                         (1..4).forEach { qty ->
-                            DropdownMenuItem(text = { Text(qty.toString()) }, onClick = {
-                                quantity = qty.toString()
-                                showQuantityMenu = false
-                            })
+                            DropdownMenuItem(
+                                text = { Text(qty.toString()) },
+                                onClick = {
+                                    quantity = qty.toString()
+                                    showQuantityMenu = false
+                                }
+                            )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
+}
+
+private fun BoxScope.finish() {
+    TODO("Not yet implemented")
 }

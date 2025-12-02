@@ -43,6 +43,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.google.android.gms.tasks.Task
 import sg.edu.np.mad.mad25_t02_team1.ExploreEventsApp
+import sg.edu.np.mad.mad25_t02_team1.ProfileActivity
+import sg.edu.np.mad.mad25_t02_team1.screens.ProfileScreen
 
 
 // NOTE: Ensure your BottomNavigationBar/BottomNavItem are defined correctly
@@ -88,7 +90,7 @@ fun BookingHistoryScaffold() {
             composable(BottomNavItem.Home.route) { HomePageContent() }
             composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
-            composable(BottomNavItem.Profile.route) { Text("Profile Screen") }
+            composable(BottomNavItem.Profile.route) { ProfileActivity() }
         }
     }
 }

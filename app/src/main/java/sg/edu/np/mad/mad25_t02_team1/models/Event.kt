@@ -50,5 +50,5 @@ data class SeatCategory(
     @get:PropertyName("Price") @set:PropertyName("Price")
     var price: Double = 0.0,
     @get:PropertyName("Section") @set:PropertyName("Section")
-    var section: List<String> = emptyList()
+    var sections: List<String> = emptyList()
 )

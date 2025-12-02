@@ -1,5 +1,6 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -323,10 +324,14 @@ fun EventDetailsContent(
                 }
             }
         }
-
+        val context = LocalContext.current
         // Buy Tickets Button
         Button(
-            onClick = { /* TODO: Implement ticket purchase */ },
+            onClick = {
+                val intent = Intent(context, BuyTicketActivity::class.java).apply {
+                    putExtra("EVENT_ID", event.id) // Pass the event ID
+                }
+                context.startActivity(intent)            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)

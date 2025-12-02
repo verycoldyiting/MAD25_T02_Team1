@@ -1,185 +1,284 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
-import androidx.compose.ui.graphics.Color
+import sg.edu.np.mad.mad25_t02_team1.models.SeatCategory
+import sg.edu.np.mad.mad25_t02_team1.models.Event
+import java.util.Locale
 
-// --- 1. GEOMETRY DATA STRUCTURES ---
-// These structures define the clickable zones. You must expand the SEATING_SECTIONS list
-// to cover all sections (101, 203, 301, etc.) visible in your seating plan image.
-
-data class SeatSection(
-    val id: String,         // Section number, e.g., "101"
-    val category: String,   // Category, e.g., "CAT A"
-    val bounds: Rect        // Normalized coordinates [left, top, right, bottom]
-)
-
-// NOTE: This list contains placeholder coordinates and must be manually mapped
-// by visually inspecting your image and calculating the 0.0 to 1.0 coordinates
-// for each rectangular bounding box.
-val SEATING_SECTIONS = listOf(
-    // Section 101 (Placeholder example)
-    SeatSection("101", "CAT B", Rect(0.15f, 0.60f, 0.25f, 0.70f)),
-    // Section 203 (Placeholder example)
-    SeatSection("203", "CAT C", Rect(0.05f, 0.35f, 0.15f, 0.45f)),
-    // ... Add all other sections here
-    SeatSection("301", "CAT A", Rect(0.30f, 0.20f, 0.50f, 0.30f))
-)
-
-// --- 2. INTERACTIVE MAP COMPOSABLE ---
+// --- STABLE CUSTOM TOP BAR (Replaces Experimental TopAppBar) ---
 @Composable
-fun InteractiveSeatingMap(
-    imageUrl: String?,
-    onSectionSelected: (SeatSection) -> Unit
-) {
-    var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    val containerSizeFloat = containerSize.toSize()
-
-    Box(
+fun StableCustomAppBar(onBackPressed: () -> Unit) {
+    // Uses stable, foundational components (Row, Icon, Text)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .background(Color.White) // Ensure the box background is white
-            .onSizeChanged { containerSize = it }
-            .padding(horizontal = 0.dp) // Force edge-to-edge width
-            .pointerInput(containerSize, SEATING_SECTIONS) {
-                detectTapGestures { offset ->
-                    if (containerSize.width == 0) return@detectTapGestures
-
-                    // Normalize click coordinates (0.0 to 1.0)
-                    val clickX = offset.x / containerSizeFloat.width
-                    val clickY = offset.y / containerSizeFloat.height
-
-                    // Check which section was hit
-                    val selected = SEATING_SECTIONS.find { section ->
-                        section.bounds.contains(Offset(clickX, clickY))
-                    }
-
-                    selected?.let {
-                        onSectionSelected(it)
-                    }
-                }
-            }
+            .height(64.dp)
+            .background(Color(0xFF00A2FF)) // Specific Blue Color
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // --- Layer 1: The Visual Seating Plan Image (White Background) ---
-        if (imageUrl != null) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = "Seating Plan",
-                modifier = Modifier.matchParentSize(),
-                contentScale = ContentScale.Fit // Use FIT to show the whole image (including borders)
+        val context = LocalContext.current as ComponentActivity // Get Activity reference
+
+        // Back Button
+        IconButton(onClick = {
+            // Use Activity.finish() to reliably close this Activity and return to EventDetails
+            context.finish()
+        }) {
+            Icon(
+                Icons.Default.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White
             )
-        } else {
-            CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Title (Empty/Placeholder Text remains for spacing)
+        /* Removed Text composable as requested */
+
+        // Spacer pushes elements to the side if needed
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 
-// --- 3. BUY TICKET SCREEN (Main UI) ---
+// --- MAIN SCREEN ---
 @Composable
-fun BuyTicketScreen() {
-    var quantity by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("") }
-    var seatNumber by remember { mutableStateOf("") }
-    var imageUrl by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+fun BuyTicketScreen(navController: NavController) {
+    val activity = LocalContext.current as ComponentActivity
+    val context = LocalContext.current
+    val eventId = remember { activity.intent.getStringExtra("EVENT_ID") ?: "" }
 
-    // Data Fetching Logic
-    LaunchedEffect(Unit) {
-        isLoading = true
+    // --- State Management ---
+    var event by remember { mutableStateOf<Event?>(null) }
+    var selectedCategory by remember { mutableStateOf<SeatCategory?>(null) }
+    var selectedSectionId by remember { mutableStateOf<String?>(null) }
+    var quantity by remember { mutableStateOf("1") }
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoadingImage by remember { mutableStateOf(true) }
+    var allSeatCategories by remember { mutableStateOf<List<SeatCategory>>(emptyList()) }
+    var isLoadingCategories by remember { mutableStateOf(true) }
+
+    // --- Dropdown Menu State ---
+    var showCategoryMenu by remember { mutableStateOf(false) }
+    var showSectionMenu by remember { mutableStateOf(false) }
+    var showQuantityMenu by remember { mutableStateOf(false) }
+
+    // --- Data Fetching ---
+    LaunchedEffect(eventId) {
+        val db = FirebaseFirestore.getInstance()
+
+        // Fetch Event Details (Required for title)
+        try {
+            val document = db.collection("Events").document(eventId).get().await()
+            event = document.toObject(Event::class.java)
+        } catch (e: Exception) { /* Log error */ }
+
+        // Fetch Image URL & Categories
+        isLoadingImage = true
+        isLoadingCategories = true
         try {
             val storageRef = FirebaseStorage.getInstance().reference.child("seating_plan.png")
-            val uri = storageRef.downloadUrl.await()
-            imageUrl = uri.toString()
-        } catch (e: Exception) {
-            imageUrl = null
-        } finally {
-            isLoading = false
+            imageUrl = storageRef.downloadUrl.await().toString()
+
+            val snapshot = db.collection("SeatCategory").get().await()
+            allSeatCategories = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(SeatCategory::class.java)
+            }
+        } catch (e: Exception) { imageUrl = null }
+        finally {
+            isLoadingImage = false
+            isLoadingCategories = false
         }
     }
 
-    // Outer Column for the whole screen (inherits Scaffold's default white background)
-    Column(
-        modifier = Modifier
-            .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    val concertTitle = event?.name ?: "Buy Ticket" // Used for display logic
+    val totalPrice = (selectedCategory?.price ?: 0.0) * (quantity.toIntOrNull() ?: 0)
 
-        // --- INTERACTIVE MAP INTEGRATION ---
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
-        } else {
-            InteractiveSeatingMap(
-                imageUrl = imageUrl,
-                onSectionSelected = { selectedSection ->
-                    // Populate the input fields based on the click
-                    category = selectedSection.category
-                    seatNumber = selectedSection.id
-                    // Quantity is left for manual input
+    Scaffold(
+        topBar = { StableCustomAppBar(onBackPressed = { activity.finish() }) }, // Uses activity.finish()
+        bottomBar = {
+            if (totalPrice > 0) {
+                Surface(modifier = Modifier.fillMaxWidth(), shadowElevation = 8.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Total Price Display
+                        Column {
+                            Text("TOTAL PRICE", style = MaterialTheme.typography.labelSmall)
+                            Text("S$ ${String.format(Locale.getDefault(), "%.2f", totalPrice)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Booking/Payment Button
+                        Button(
+                            onClick = {
+                                val intent = Intent(context, PaymentDetailActivity::class.java).apply {
+                                    // Pass all collected booking data
+                                    putExtra("EVENT_ID", eventId)
+                                    putExtra("CATEGORY_NAME", selectedCategory?.category)
+                                    putExtra("SECTION_ID", selectedSectionId)
+                                    putExtra("QUANTITY", quantity.toIntOrNull() ?: 0)
+                                    putExtra("TOTAL_PRICE", totalPrice)
+                                }
+                                context.startActivity(intent)
+                            },
+                            enabled = selectedCategory != null && selectedSectionId != null && quantity.toIntOrNull() in 1..4
+                        ) {
+                            Text("Book Now")
+                        }
+                    }
                 }
-            )
+            }
         }
-
-        // --- INPUTS SECTION (Padded Content) ---
+    ) { innerPadding ->
+        // Main scrollable content
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(innerPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // The input fields now show the dynamically updated state
-            OutlinedTextField(
-                value = quantity,
-                onValueChange = { quantity = it },
-                label = { Text("Quantity") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            // --- 1. STATIC SEATING MAP IMAGE ---
+            if (isLoadingImage || isLoadingCategories) {
+                CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .background(Color.White)
+                        .padding(horizontal = 0.dp)
+                ) {
+                    if (imageUrl != null) {
+                        AsyncImage(model = imageUrl, contentDescription = "Seating Plan", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    } else {
+                        Text("Seating map unavailable.", Modifier.align(Alignment.Center))
+                    }
+                }
+            }
 
-            OutlinedTextField(
-                value = category,
-                onValueChange = { category = it },
-                label = { Text("Category") },
-                // Make category display read-only as it's determined by the map click
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            // --- 2. CONCERT TITLE DISPLAY (BELOW IMAGE) ---
+            if (event != null) {
+                Text(
+                    text = event!!.name ?: "Ticket Selection",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp).padding(horizontal = 16.dp)
+                )
+            }
 
-            OutlinedTextField(
-                value = seatNumber,
-                onValueChange = { seatNumber = it },
-                label = { Text("Seat Number / Section ID") },
-                // Make seatNumber display read-only as it's determined by the map click
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = { /* Handle booking logic here */ },
-                modifier = Modifier.fillMaxWidth()
+            // --- 3. INPUTS SECTION (Dropdowns) ---
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
             ) {
-                Text("Book")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // A. CATEGORY DROPDOWN
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedCategory?.category ?: "Select Category",
+                        onValueChange = {},
+                        label = { Text("Category") },
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable(enabled = allSeatCategories.isNotEmpty()) { showCategoryMenu = true })
+                    DropdownMenu(expanded = showCategoryMenu, onDismissRequest = { showCategoryMenu = false }) {
+                        allSeatCategories.forEach { cat ->
+                            DropdownMenuItem(text = { Text(cat.category) }, onClick = {
+                                selectedCategory = cat
+                                selectedSectionId = null
+                                showCategoryMenu = false
+                            })
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // B. PRICE DISPLAY (Read-Only)
+                OutlinedTextField(
+                    value = selectedCategory?.price?.let { "S$ ${String.format("%.2f", it)}" } ?: "Price",
+                    onValueChange = {},
+                    label = { Text("Price (Per Ticket)") },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // C. SECTION DROPDOWN
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedSectionId ?: "Select Section ID",
+                        onValueChange = {},
+                        label = { Text("Section ID") },
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable(enabled = selectedCategory?.sections?.isNotEmpty() == true) { showSectionMenu = true })
+                    DropdownMenu(expanded = showSectionMenu, onDismissRequest = { showSectionMenu = false }) {
+                        selectedCategory?.sections?.forEach { section ->
+                            DropdownMenuItem(text = { Text(section) }, onClick = {
+                                selectedSectionId = section
+                                showSectionMenu = false
+                            })
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // D. QUANTITY DROPDOWN (1-4)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = {},
+                        label = { Text("Quantity") },
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable { showQuantityMenu = true })
+                    DropdownMenu(expanded = showQuantityMenu, onDismissRequest = { showQuantityMenu = false }) {
+                        (1..4).forEach { qty ->
+                            DropdownMenuItem(text = { Text(qty.toString()) }, onClick = {
+                                quantity = qty.toString()
+                                showQuantityMenu = false
+                            })
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

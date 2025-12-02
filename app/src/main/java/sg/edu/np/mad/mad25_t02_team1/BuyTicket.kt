@@ -1,93 +1,275 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.tasks.await
+import sg.edu.np.mad.mad25_t02_team1.models.SeatCategory
+import sg.edu.np.mad.mad25_t02_team1.models.Event
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import java.util.Locale
 
+// --- STABLE CUSTOM TOP BAR (Matches EventDetails Look and Go-Back Functionality) ---
 @Composable
-fun BuyTicketScreen() {
-    var quantity by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("") }
-    var seatNumber by remember { mutableStateOf("") }
-    var imageUrl by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+fun StableCustomAppBar(onBackPressed: () -> Unit) {
 
-    LaunchedEffect(Unit) {
-        val storageRef = FirebaseStorage.getInstance().reference.child("seating_plan.png")
-        storageRef.downloadUrl.addOnSuccessListener { uri ->
-            imageUrl = uri.toString()
-            isLoading = false
-        }.addOnFailureListener {
-            isLoading = false
-        }
-    }
-
-    Column(
+    Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxWidth()
+            .height(64.dp)
+            .background(Color(0xFF00A2FF)) // Blue Color
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.padding(vertical = 60.dp))
-        } else if (imageUrl != null) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = "Seating Plan",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+        // Back Button
+        IconButton(onClick = onBackPressed) { // Executes Activity.finish()
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack, // Stable RTL icon
+                contentDescription = "Back",
+                tint = Color.White
             )
-        } else {
-            Text("Image could not be loaded.", modifier = Modifier.padding(vertical = 60.dp))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
-        OutlinedTextField(
-            value = quantity,
-            onValueChange = { quantity = it },
-            label = { Text("Quantity") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = category,
-            onValueChange = { category = it },
-            label = { Text("Category") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = seatNumber,
-            onValueChange = { seatNumber = it },
-            label = { Text("Seat Number") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = { /* Handle booking logic here */ },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Book")
-        }
+        // No title text, as requested, allowing the bar to remain empty/minimal
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
-@Preview(showBackground = true)
+
+// --- MAIN SCREEN ---
 @Composable
-fun BuyTicketScreenPreview() {
-    MAD25_T02_Team1Theme {
-        BuyTicketScreen()
+fun BuyTicketScreen(navController: NavController) {
+    val activity = LocalContext.current as ComponentActivity
+    val context = LocalContext.current
+    val eventId = remember { activity.intent.getStringExtra("EVENT_ID") ?: "" }
+
+    // --- State Management ---
+    var event by remember { mutableStateOf<Event?>(null) }
+    var selectedCategory by remember { mutableStateOf<SeatCategory?>(null) }
+    var selectedSectionId by remember { mutableStateOf<String?>(null) }
+    var quantity by remember { mutableStateOf("1") }
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoadingImage by remember { mutableStateOf(true) }
+    var allSeatCategories by remember { mutableStateOf<List<SeatCategory>>(emptyList()) }
+    var isLoadingCategories by remember { mutableStateOf(true) }
+
+    // --- Dropdown Menu State ---
+    var showCategoryMenu by remember { mutableStateOf(false) }
+    var showSectionMenu by remember { mutableStateOf(false) }
+    var showQuantityMenu by remember { mutableStateOf(false) }
+
+    // --- Data Fetching ---
+    LaunchedEffect(eventId) {
+        val db = FirebaseFirestore.getInstance()
+
+        // Fetch Event Details
+        try {
+            val document = db.collection("Events").document(eventId).get().await()
+            event = document.toObject(Event::class.java)
+        } catch (e: Exception) { /* Log error */ }
+
+        // Fetch Image URL & Categories
+        isLoadingImage = true
+        isLoadingCategories = true
+        try {
+            val storageRef = FirebaseStorage.getInstance().reference.child("seating_plan.png")
+            imageUrl = storageRef.downloadUrl.await().toString()
+
+            val snapshot = db.collection("SeatCategory").get().await()
+            allSeatCategories = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(SeatCategory::class.java)
+            }
+        } catch (e: Exception) { imageUrl = null }
+        finally {
+            isLoadingImage = false
+            isLoadingCategories = false
+        }
+    }
+
+    val totalPrice = (selectedCategory?.price ?: 0.0) * (quantity.toIntOrNull() ?: 0)
+
+    Scaffold(
+        topBar = { StableCustomAppBar(onBackPressed = { activity.finish() }) },
+        bottomBar = {
+            if (totalPrice > 0) {
+                Surface(modifier = Modifier.fillMaxWidth(), shadowElevation = 8.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Total Price Display
+                        Column {
+                            Text("TOTAL PRICE", style = MaterialTheme.typography.labelSmall)
+                            Text("S$ ${String.format(Locale.getDefault(), "%.2f", totalPrice)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Booking/Payment Button
+                        Button(
+                            onClick = {
+                                val intent = Intent(context, PaymentDetailActivity::class.java).apply {
+                                    putExtra("EVENT_ID", eventId)
+                                    putExtra("CATEGORY_NAME", selectedCategory?.category)
+                                    putExtra("SECTION_ID", selectedSectionId)
+                                    putExtra("QUANTITY", quantity.toIntOrNull() ?: 0)
+                                    putExtra("TOTAL_PRICE", totalPrice)
+                                }
+                                context.startActivity(intent)
+                            },
+                            enabled = selectedCategory != null && selectedSectionId != null && quantity.toIntOrNull() in 1..4
+                        ) {
+                            Text("Book Now")
+                        }
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        // Main scrollable content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(innerPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            // --- 1. STATIC SEATING MAP IMAGE ---
+            if (isLoadingImage || isLoadingCategories) {
+                CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .background(Color.White)
+                        .padding(horizontal = 0.dp)
+                ) {
+                    if (imageUrl != null) {
+                        AsyncImage(model = imageUrl, contentDescription = "Seating Plan", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    } else {
+                        Text("Seating map unavailable.", Modifier.align(Alignment.Center))
+                    }
+                }
+            }
+
+            // --- 2. CONCERT TITLE DISPLAY (BELOW IMAGE) ---
+            if (event != null) {
+                Text(
+                    text = event!!.name ?: "Ticket Selection",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp).padding(horizontal = 16.dp)
+                )
+            }
+
+            // --- 3. INPUTS SECTION (Dropdowns) ---
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // A. CATEGORY DROPDOWN
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedCategory?.category ?: "Select Category",
+                        onValueChange = {},
+                        label = { Text("Category") },
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable(enabled = allSeatCategories.isNotEmpty()) { showCategoryMenu = true })
+                    DropdownMenu(expanded = showCategoryMenu, onDismissRequest = { showCategoryMenu = false }) {
+                        allSeatCategories.forEach { cat ->
+                            DropdownMenuItem(text = { Text(cat.category) }, onClick = {
+                                selectedCategory = cat
+                                selectedSectionId = null
+                                showCategoryMenu = false
+                            })
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // B. PRICE DISPLAY (Read-Only)
+                OutlinedTextField(
+                    value = selectedCategory?.price?.let { "S$ ${String.format("%.2f", it)}" } ?: "Price",
+                    onValueChange = {},
+                    label = { Text("Price (Per Ticket)") },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // C. SECTION DROPDOWN
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedSectionId ?: "Select Section ID",
+                        onValueChange = {},
+                        label = { Text("Section ID") },
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable(enabled = selectedCategory?.sections?.isNotEmpty() == true) { showSectionMenu = true })
+                    DropdownMenu(expanded = showSectionMenu, onDismissRequest = { showSectionMenu = false }) {
+                        selectedCategory?.sections?.forEach { section ->
+                            DropdownMenuItem(text = { Text(section) }, onClick = {
+                                selectedSectionId = section
+                                showSectionMenu = false
+                            })
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // D. QUANTITY DROPDOWN (1-4)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = {},
+                        label = { Text("Quantity") },
+                        readOnly = true,
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.matchParentSize().clickable { showQuantityMenu = true })
+                    DropdownMenu(expanded = showQuantityMenu, onDismissRequest = { showQuantityMenu = false }) {
+                        (1..4).forEach { qty ->
+                            DropdownMenuItem(text = { Text(qty.toString()) }, onClick = {
+                                quantity = qty.toString()
+                                showQuantityMenu = false
+                            })
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
     }
 }

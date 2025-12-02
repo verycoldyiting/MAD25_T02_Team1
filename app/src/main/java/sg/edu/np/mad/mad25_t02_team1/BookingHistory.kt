@@ -31,6 +31,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.BottomNavItem
@@ -39,16 +40,11 @@ import sg.edu.np.mad.mad25_t02_team1.HomePageContent
 import sg.edu.np.mad.mad25_t02_team1.TicketLahHeader
 import sg.edu.np.mad.mad25_t02_team1.models.Booking
 import sg.edu.np.mad.mad25_t02_team1.models.Event
+import sg.edu.np.mad.mad25_t02_team1.ExploreEventsApp
 import java.text.SimpleDateFormat
 import java.util.*
 import com.google.android.gms.tasks.Task
-import sg.edu.np.mad.mad25_t02_team1.ExploreEventsApp
 
-
-// NOTE: Ensure your BottomNavigationBar/BottomNavItem are defined correctly
-// (e.g., using NavController and routes, or the old selectedItem/onItemSelected structure)
-// based on previous steps. This code assumes the old structure (selectedItem) for simplicity,
-// but the navigation logic inside the Scaffold block is correct for the NavHost pattern.
 
 
 @Composable
@@ -93,54 +89,75 @@ fun BookingHistoryScaffold() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun BookingHistoryScreen() {
     var bookingWithEvents by remember { mutableStateOf<List<Pair<Booking, Event?>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    // TEMP: default account id for testing.
-    val accountId = "A001"
 
-    LaunchedEffect(key1 = accountId) {
+    // 1. Get the Firebase UID
+    val firebaseUid = FirebaseAuth.getInstance().currentUser?.uid
+
+    // LaunchedEffect runs when the Firebase UID changes (i.e., user logs in)
+    LaunchedEffect(key1 = firebaseUid) {
+        if (firebaseUid.isNullOrEmpty()) {
+            isLoading = false
+            return@LaunchedEffect
+        }
+
         isLoading = true
-        delay(300) // Ensure animation is visible
+
         try {
             val db = FirebaseFirestore.getInstance()
-            val accountRef = db.document("/Account/$accountId")
+
+            // --- STEP 1: FIND THE CUSTOM ACCOUNT DOCUMENT ID (e.g., "A001") ---
+            // Query the /Account collection to find the document where the 'uid' field matches the current Firebase UID.
+            // (Assumes Account documents have a field named 'uid' matching the Firebase UID)
+            val accountQuerySnapshot = db.collection("Account")
+                .whereEqualTo("uid", firebaseUid)
+                .limit(1)
+                .get()
+                .await()
+
+            // Extract the actual Document ID (e.g., "A001") which is the custom AccID
+            val resolvedCustomAccId = accountQuerySnapshot.documents.firstOrNull()?.id
+
+            // If the custom Account ID cannot be resolved, stop.
+            if (resolvedCustomAccId.isNullOrEmpty()) {
+                Log.e("BookingHistory", "Could not find custom Account ID for UID: $firebaseUid")
+                isLoading = false
+                return@LaunchedEffect
+            }
+
+            // --- STEP 2: FETCH BOOKINGS USING THE DocumentReference to the Account ---
+            // Construct the DocumentReference using the resolved custom ID
+            val accountRef = db.document("/Account/$resolvedCustomAccId")
 
             val bookingSnapshot = db.collection("BookingDetails")
-                // FIX: Use the correct database field name AccID
+                // Query looks for documents where AccID points to /Account/A001
                 .whereEqualTo("AccID", accountRef)
                 .get()
                 .await()
 
+            // --- STEP 3: Process Bookings and Fetch Events ---
             val bookingList = bookingSnapshot.documents.mapNotNull { doc ->
-                // Ensure ID is copied for context
                 doc.toObject(Booking::class.java)?.copy(id = doc.id)
             }
 
-            // Fetch events in parallel using Tasks.whenAllSuccess and await
-            val eventTasks: List<Task<DocumentSnapshot>> = bookingList.mapNotNull { booking ->
-                booking.eventId?.let { eventId ->
-                    db.collection("Events").document(eventId).get()
-                }
+            val eventTasks = bookingList.mapNotNull { booking ->
+                booking.eventId?.let { db.collection("Events").document(it).get() }
             }
-
-            // Wait for all event fetch tasks to finish
             val results = Tasks.whenAllSuccess<DocumentSnapshot>(eventTasks).await()
-            val eventDocuments = results.filterIsInstance<DocumentSnapshot>()
-
-            val eventMap = eventDocuments
+            val eventMap = results.filterIsInstance<DocumentSnapshot>()
                 .mapNotNull { doc -> doc.toObject(Event::class.java)?.copy(id = doc.id) }
                 .associateBy { it.id }
 
-            // Pair bookings with their respective events
             val eventBookingPairs = bookingList.map { booking ->
-                val event = booking.eventId?.let { eventMap[it] }
-                booking to event
+                booking to booking.eventId?.let { eventMap[it] }
             }
 
             bookingWithEvents = eventBookingPairs
+
         } catch (e: Exception) {
             Log.e("BookingHistory", "Error fetching data", e)
         } finally {

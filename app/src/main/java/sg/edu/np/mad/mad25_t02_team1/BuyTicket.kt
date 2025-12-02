@@ -129,11 +129,31 @@ fun BuyTicketScreen(navController: NavController) {
                         // Booking/Payment Button
                         Button(
                             onClick = {
-                                val intent = Intent(context, PaymentDetailActivity::class.java).apply {
-                                    putExtra("EVENT_ID", eventId)
-                                    putExtra("CATEGORY_NAME", selectedCategory?.category)
-                                    putExtra("SECTION_ID", selectedSectionId)
-                                    putExtra("QUANTITY", quantity.toIntOrNull() ?: 0)
+                                // Prepare the Intent to launch PaymentPage (which you called PaymentDetailActivity previously)
+                                val intent = Intent(context, PaymentPage::class.java).apply {
+
+                                    // --- 1. Event Details (Fetched from 'event' state) ---
+                                    // Note: Use the naming convention expected by PaymentPage's onCreate
+                                    putExtra("eventId", eventId)
+                                    putExtra("title", event?.name ?: "Unknown Concert")
+                                    putExtra("artist", event?.artist ?: "Unknown Artist")
+                                    // Convert Firebase Timestamp to Milliseconds for dateMillis
+                                    // Using a default of 0L if the date is null
+                                    val dateMillis = event?.date?.toDate()?.time ?: 0L
+                                    putExtra("dateMillis", dateMillis)
+                                    putExtra("venue", event?.venue ?: "TBA")
+
+                                    // --- 2. Ticket Details (Fetched from state) ---
+                                    putExtra("category", selectedCategory?.category)
+                                    putExtra("section", selectedSectionId)
+                                    putExtra("quantity", quantity.toIntOrNull() ?: 1)
+
+                                    // --- 3. Price Details (Fetch price per ticket, not total) ---
+                                    // Calculate the price per ticket from the selected category
+                                    putExtra("pricePerTicket", selectedCategory?.price ?: 0.0)
+
+                                    // TOTAL_PRICE is no longer needed by PaymentPage's onCreate but is included
+                                    // for completeness or if it's used elsewhere in PaymentPage.
                                     putExtra("TOTAL_PRICE", totalPrice)
                                 }
                                 context.startActivity(intent)

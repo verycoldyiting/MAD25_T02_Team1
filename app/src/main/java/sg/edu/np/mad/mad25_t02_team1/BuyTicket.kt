@@ -108,7 +108,6 @@ fun BuyTicketScreen(navController: NavController) {
         }
     }
 
-    val concertTitle = event?.name ?: "Buy Ticket"
     val totalPrice = (selectedCategory?.price ?: 0.0) * (quantity.toIntOrNull() ?: 0)
 
     Scaffold(

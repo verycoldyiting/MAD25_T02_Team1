@@ -20,15 +20,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.jvm.java
 import kotlin.random.Random
 
 class PaymentPage : ComponentActivity() {
@@ -80,6 +82,62 @@ fun PaymentScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val db = FirebaseFirestore.getInstance()
+    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+
+    // ===========================================================
+    // LOAD LOGGED-IN USER ACCOUNT FROM FIRESTORE (IMPORTANT)
+    // ===========================================================
+    var accountId by remember { mutableStateOf<String?>(null) }
+    var accountError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(true) {
+        val uid = auth.currentUser?.uid
+
+        if (uid == null) {
+            accountError = "No logged in user"
+            return@LaunchedEffect
+        }
+
+        db.collection("Account")
+            .whereEqualTo("uid", uid)
+            .get()
+            .addOnSuccessListener { snap ->
+                if (!snap.isEmpty) {
+                    val doc = snap.documents.first()
+                    accountId = doc.getString("accountId") // example: "A001"
+                } else {
+                    accountError = "Account not found"
+                }
+            }
+            .addOnFailureListener {
+                accountError = "Failed to load account"
+            }
+    }
+
+    // UI waits until account is loaded
+    if (accountId == null && accountError == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    if (accountError != null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Unable to load your account. Please try again.")
+        }
+        return
+    }
+
+    // ===========================================================
+    // NORMAL PAYMENT UI BELOW
+    // ===========================================================
 
     // Card fields
     var cardName by remember { mutableStateOf("") }
@@ -122,15 +180,15 @@ fun PaymentScreen(
             .fillMaxSize()
             .background(Color(0xFFF2F4F7))
     ) {
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
 
             Text(
-                text = "Payment",
+                "Payment",
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
             )
 
@@ -154,7 +212,7 @@ fun PaymentScreen(
                 discountAmount = discountAmount,
                 finalTotal = finalTotal,
                 promoInput = promoInput,
-                onPromoInputChange = { promoInput = it },
+                onPromoInputChange = { promoInput = it.uppercase() },
                 appliedPromo = appliedPromo,
                 promoError = promoError,
                 onApplyPromo = {
@@ -166,7 +224,7 @@ fun PaymentScreen(
                     } else {
                         appliedPromo = null
                         discountAmount = 0.0
-                        promoError = "Invalid or ineligible code"
+                        promoError = "Invalid promo code"
                     }
                 }
             )
@@ -174,113 +232,88 @@ fun PaymentScreen(
             Spacer(Modifier.height(12.dp))
 
             CardDetailsSection(
-                cardName = cardName,
-                onCardNameChange = { cardName = it },
-                cardNumber = cardNumber,
-                onCardNumberChange = { cardNumber = it },
-                expiryMonth = expiryMonth,
-                onExpiryMonthChange = { expiryMonth = it },
-                expiryYear = expiryYear,
-                onExpiryYearChange = { expiryYear = it },
-                cvv = cvv,
-                onCvvChange = { cvv = it }
+                cardName, { cardName = it },
+                cardNumber, { cardNumber = it },
+                expiryMonth, { expiryMonth = it },
+                expiryYear, { expiryYear = it },
+                cvv, { cvv = it }
             )
 
             Spacer(Modifier.height(12.dp))
 
             BillingAddressSection(
-                billingName = billingName,
-                onBillingNameChange = { billingName = it },
-                addressLine1 = addressLine1,
-                onAddressLine1Change = { addressLine1 = it },
-                postalCode = postalCode,
-                onPostalCodeChange = { postalCode = it },
-                city = city,
-                onCityChange = { city = it },
-                country = country,
-                onCountryChange = { country = it }
+                billingName, { billingName = it },
+                addressLine1, { addressLine1 = it },
+                postalCode, { postalCode = it },
+                city, { city = it },
+                country, { country = it }
             )
 
             Spacer(Modifier.height(24.dp))
 
-            Column {
+            // BUTTONS
+            if (isProcessing) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
 
-                if (isProcessing) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            PrimaryGradientButton(
+                text = "Buy now • \$${String.format("%.2f", finalTotal)}",
+                enabled = !isProcessing
+            ) {
+
+                // Validate card
+                if (!validateCard(cardName, cardNumber, expiryMonth, expiryYear, cvv)) {
+                    Toast.makeText(context, "Check your card details", Toast.LENGTH_SHORT).show()
+                    return@PrimaryGradientButton
                 }
 
-                PrimaryGradientButton(
-                    text = "Buy now • \$${String.format("%.2f", finalTotal)}",
-                    enabled = !isProcessing
-                ) {
+                // Validate billing
+                if (billingName.isBlank() || addressLine1.isBlank() || postalCode.isBlank()) {
+                    Toast.makeText(context, "Billing address required", Toast.LENGTH_SHORT).show()
+                    return@PrimaryGradientButton
+                }
 
-                    if (!validateCard(cardName, cardNumber, expiryMonth, expiryYear, cvv)) {
-                        Toast.makeText(context, "Check your card details", Toast.LENGTH_SHORT).show()
-                        return@PrimaryGradientButton
+                isProcessing = true
+
+                val bookingId = generateBookingId()
+
+                val bookingData = hashMapOf(
+                    "AccID" to db.document("Account/$accountId"),
+                    "Category" to category,
+                    "ConcertTitle" to title,
+                    "EventID" to eventId,
+                    "EventTime" to Timestamp(Date(dateMillis)),
+                    "Name" to cardName,
+                    "PaymentMethod" to "Card",
+                    "PurchaseTime" to Timestamp.now(),
+                    "Quantity" to quantity,
+                    "Section" to section,
+                    "TotalPrice" to finalTotal
+                )
+
+                db.collection("BookingDetails")
+                    .document(bookingId)
+                    .set(bookingData)
+                    .addOnSuccessListener {
+                        isProcessing = false
+                        showSuccessDialog = true
                     }
-
-                    if (billingName.isBlank() || addressLine1.isBlank() || postalCode.isBlank()) {
-                        Toast.makeText(context, "Billing address required", Toast.LENGTH_SHORT).show()
-                        return@PrimaryGradientButton
+                    .addOnFailureListener { ex ->
+                        isProcessing = false
+                        Toast.makeText(context, ex.message, Toast.LENGTH_SHORT).show()
                     }
+            }
 
-                    isProcessing = true
+            Spacer(Modifier.height(8.dp))
 
-                    val bookingId = generateBookingId()
-
-                    val bookingData = hashMapOf(
-                        "BookingId" to bookingId,
-                        "EventId" to eventId,
-                        "Title" to title,
-                        "Artist" to artist,
-                        "Date" to Timestamp(Date(dateMillis)),
-                        "Venue" to venue,
-                        "Category" to category,
-                        "Section" to section,
-                        "Quantity" to quantity,
-                        "PricePerTicket" to pricePerTicket,
-                        "Subtotal" to subtotal,
-                        "BookingFee" to bookingFee,
-                        "DiscountAmount" to discountAmount,
-                        "TotalPrice" to finalTotal,
-                        "PaymentMethod" to "Card",
-                        "CardLast4" to cardNumber.takeLast(4),
-                        "BillingName" to billingName,
-                        "BillingAddress" to addressLine1,
-                        "PostalCode" to postalCode,
-                        "City" to city,
-                        "Country" to country,
-                        "AppliedPromo" to appliedPromo,
-                        "CreatedAt" to Timestamp.now()
-                    )
-
-                    db.collection("BookingDetails")
-                        .document(bookingId)
-                        .set(bookingData)
-                        .addOnSuccessListener {
-                            isProcessing = false
-                            showSuccessDialog = true
-                        }
-                        .addOnFailureListener { ex ->
-                            isProcessing = false
-                            Toast.makeText(context, "Error: ${ex.message}", Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                SecondaryOutlineButton(
-                    text = "Cancel",
-                    enabled = !isProcessing
-                ) {
-                    activity?.finish()
-                }
+            SecondaryOutlineButton("Cancel", !isProcessing) {
+                activity?.finish()
             }
 
             Spacer(Modifier.height(12.dp))
         }
 
+        // SUCCESS POPUP
         if (showSuccessDialog) {
             AlertDialog(
                 onDismissRequest = {},
@@ -288,9 +321,17 @@ fun PaymentScreen(
                     TextButton(
                         onClick = {
                             showSuccessDialog = false
+
+                            val bookingIntent = android.content.Intent(
+                                context,
+                                BookingHistoryActivity::class.java
+                            )
+                            context.startActivity(bookingIntent)
                             activity?.finish()
                         }
-                    ) { Text("View Booking") }
+                    ) {
+                        Text("View Booking")
+                    }
                 },
                 dismissButton = {
                     TextButton(
@@ -301,11 +342,13 @@ fun PaymentScreen(
                     ) { Text("Close") }
                 },
                 title = { Text("Payment Successful") },
-                text = { Text("Your tickets are confirmed. View them in Booking Details.") }
+                text = { Text("Your tickets are confirmed.") }
             )
         }
     }
 }
+
+
 
 /* ------------------------------------------------------------------
    Reusable Components (NO CHANGES NEEDED)

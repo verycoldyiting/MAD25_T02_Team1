@@ -40,11 +40,15 @@
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
         <activity
-            android:name=".ProfileActivity"
+            android:name=".EventDetailsActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
         <activity
-            android:name=".EventDetailsActivity"
+            android:name=".ui.screens.ProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
+        <activity
+            android:name=".ui.screens.EditProfileActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
     </application>

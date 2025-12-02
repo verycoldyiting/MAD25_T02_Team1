@@ -1,5 +1,4 @@
 package sg.edu.np.mad.mad25_t02_team1
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -12,16 +11,17 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
 
+
 @Composable
 fun TicketLahHeader() {
 
     val logoUrl =
-        "https://firebasestorage.googleapis.com/v0/b/mad25t02team1.firebasestorage.app/o/image-removebg-preview.png?alt=media&token=3b068498-aeb6-4491-8ab2-17c10f807a2d"
+        "https://firebasestorage.googleapis.com/v0/b/mad25t02team1.firebasestorage.app/o/6129816439578364825-removebg-preview.png?alt=media&token=64926ab9-1600-4e26-bd90-791f57552ff3"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(85.dp)
+            .height(100.dp) // Bigger header
             .background(Color(0xFF00A2FF)),
         contentAlignment = Alignment.Center
     ) {
@@ -32,16 +32,11 @@ fun TicketLahHeader() {
             AsyncImage(
                 model = logoUrl,
                 contentDescription = "TicketLah Logo",
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(150.dp) // Perfect size
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            // Spacer(Modifier.width(1.dp))
 
-            Text(
-                text = "TicketLah!",
-                color = Color.White,
-                style = MaterialTheme.typography.headlineSmall
-            )
         }
     }
 }

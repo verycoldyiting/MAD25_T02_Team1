@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,10 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
@@ -27,29 +24,27 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.SeatCategory
 import sg.edu.np.mad.mad25_t02_team1.models.Event
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.util.Locale
 
-// --- STABLE CUSTOM TOP BAR (Replaces Experimental TopAppBar) ---
+// --- STABLE CUSTOM TOP BAR (Matches EventDetails Look and Go-Back Functionality) ---
 @Composable
 fun StableCustomAppBar(onBackPressed: () -> Unit) {
-    // Uses stable, foundational components (Row, Icon, Text)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .background(Color(0xFF00A2FF)) // Specific Blue Color
+            .background(Color(0xFF00A2FF)) // Blue Color
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val context = LocalContext.current as ComponentActivity // Get Activity reference
-
         // Back Button
-        IconButton(onClick = {
-            // Use Activity.finish() to reliably close this Activity and return to EventDetails
-            context.finish()
-        }) {
+        IconButton(onClick = onBackPressed) { // Executes Activity.finish()
             Icon(
-                Icons.Default.ArrowBack,
+                Icons.AutoMirrored.Filled.ArrowBack, // Stable RTL icon
                 contentDescription = "Back",
                 tint = Color.White
             )
@@ -57,10 +52,7 @@ fun StableCustomAppBar(onBackPressed: () -> Unit) {
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Title (Empty/Placeholder Text remains for spacing)
-        /* Removed Text composable as requested */
-
-        // Spacer pushes elements to the side if needed
+        // No title text, as requested, allowing the bar to remain empty/minimal
         Spacer(modifier = Modifier.weight(1f))
     }
 }
@@ -92,7 +84,7 @@ fun BuyTicketScreen(navController: NavController) {
     LaunchedEffect(eventId) {
         val db = FirebaseFirestore.getInstance()
 
-        // Fetch Event Details (Required for title)
+        // Fetch Event Details
         try {
             val document = db.collection("Events").document(eventId).get().await()
             event = document.toObject(Event::class.java)
@@ -116,11 +108,11 @@ fun BuyTicketScreen(navController: NavController) {
         }
     }
 
-    val concertTitle = event?.name ?: "Buy Ticket" // Used for display logic
+    val concertTitle = event?.name ?: "Buy Ticket"
     val totalPrice = (selectedCategory?.price ?: 0.0) * (quantity.toIntOrNull() ?: 0)
 
     Scaffold(
-        topBar = { StableCustomAppBar(onBackPressed = { activity.finish() }) }, // Uses activity.finish()
+        topBar = { StableCustomAppBar(onBackPressed = { activity.finish() }) },
         bottomBar = {
             if (totalPrice > 0) {
                 Surface(modifier = Modifier.fillMaxWidth(), shadowElevation = 8.dp) {
@@ -139,7 +131,6 @@ fun BuyTicketScreen(navController: NavController) {
                         Button(
                             onClick = {
                                 val intent = Intent(context, PaymentDetailActivity::class.java).apply {
-                                    // Pass all collected booking data
                                     putExtra("EVENT_ID", eventId)
                                     putExtra("CATEGORY_NAME", selectedCategory?.category)
                                     putExtra("SECTION_ID", selectedSectionId)

@@ -32,13 +32,12 @@ import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Locale
 
 class EventDetailsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Get the event ID passed from the previous screen
         val eventId = intent.getStringExtra("EVENT_ID") ?: ""
 
         setContent {
@@ -59,118 +58,103 @@ fun EventDetailsScreen(
 ) {
     var event by remember { mutableStateOf<Event?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    var imageUrl by remember { mutableStateOf<String?>(null) }
-    var isLoadingImage by remember { mutableStateOf(true) }
 
-    // Fetch event details from Firebase
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+    var loadingImage by remember { mutableStateOf(true) }
+
+    // Fetch Event
     LaunchedEffect(eventId) {
-        isLoading = true
         try {
-            val db = FirebaseFirestore.getInstance()
-            val document = db.collection("Events").document(eventId).get().await()
-            event = document.toObject(Event::class.java)?.copy(id = document.id)
+            val doc = FirebaseFirestore.getInstance()
+                .collection("Events")
+                .document(eventId)
+                .get()
+                .await()
+
+            event = doc.toObject(Event::class.java)
         } catch (e: Exception) {
-            Log.e("EventDetails", "Error loading event", e)
-        } finally {
-            isLoading = false
+            Log.e("EventDetails", "Error: ${e.message}")
         }
+        isLoading = false
     }
 
     // Load event image
     LaunchedEffect(event?.eventImage) {
-        val rawUrl = event?.eventImage?.trim() ?: ""
-        if (rawUrl.isEmpty()) {
-            isLoadingImage = false
+        val raw = event?.eventImage ?: ""
+        if (raw.isEmpty()) {
+            loadingImage = false
             return@LaunchedEffect
         }
 
-        isLoadingImage = true
-        imageUrl = if (rawUrl.startsWith("gs://")) {
-            try {
-                val ref = FirebaseStorage.getInstance().getReferenceFromUrl(rawUrl)
-                ref.downloadUrl.await().toString()
-            } catch (e: Exception) {
-                Log.e("ImageLoad", "Failed to get download URL", e)
-                null
-            }
-        } else {
-            rawUrl
+        loadingImage = true
+
+        imageUrl = try {
+            if (raw.startsWith("gs://")) {
+                FirebaseStorage.getInstance().getReferenceFromUrl(raw)
+                    .downloadUrl.await().toString()
+            } else raw
+        } catch (e: Exception) {
+            Log.e("ImageLoad", "Error loading image: ${e.message}")
+            null
         }
-        isLoadingImage = false
+
+        loadingImage = false
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-    ) {
-        // Custom Header with Back Button
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(85.dp)
-                .background(Color(0xFF00A2FF))
-        ) {
-            // Back Button
-            IconButton(
-                onClick = onBackPressed,
+    Scaffold(
+        topBar = {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 8.dp)
+                    .fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.White
-                )
-            }
+                TicketLahHeader()
 
-            // Center Logo and Title
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.align(Alignment.Center)
-            ) {
-                AsyncImage(
-                    model = "https://firebasestorage.googleapis.com/v0/b/mad25t02team1.firebasestorage.app/o/image-removebg-preview.png?alt=media&token=3b068498-aeb6-4491-8ab2-17c10f807a2d",
-                    contentDescription = "TicketLah Logo",
-                    modifier = Modifier.size(40.dp)
-                )
+                // Beautiful Back Button
+                IconButton(
+                    onClick = onBackPressed,
+                    modifier = Modifier
+                        .padding(start = 10.dp, top = 20.dp)
+                        .size(60.dp)
+                        .align(Alignment.TopStart)
+                ) {
 
-                Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .size(24.dp)
+                        )
 
-                Text(
-                    text = "TicketLah!",
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall
-                )
+                }
             }
         }
+    ) { padding ->
 
-        // Content Area
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else if (event != null) {
-            EventDetailsContent(
-                event = event!!,
-                imageUrl = imageUrl,
-                isLoadingImage = isLoadingImage
-            )
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Event not found",
-                    fontSize = 16.sp,
-                    color = Color.Gray
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(Color(0xFFF5F5F5))
+        ) {
+
+            when {
+                isLoading -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
+
+                event != null -> EventDetailsContent(
+                    event = event!!,
+                    imageUrl = imageUrl,
+                    loadingImage = loadingImage
                 )
+
+                else -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { Text("Event not found", color = Color.Gray) }
             }
         }
     }
@@ -180,26 +164,24 @@ fun EventDetailsScreen(
 fun EventDetailsContent(
     event: Event,
     imageUrl: String?,
-    isLoadingImage: Boolean,
-    modifier: Modifier = Modifier
+    loadingImage: Boolean
 ) {
+    val context = LocalContext.current
+
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+        modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
-        // Event Image
+
+        // IMAGE
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
-                .background(Color.LightGray),
+                .height(300.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (isLoadingImage) {
-                CircularProgressIndicator()
-            } else if (imageUrl != null) {
-                AsyncImage(
+            when {
+                loadingImage -> CircularProgressIndicator()
+                imageUrl != null -> AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
                         .crossfade(true)
@@ -208,223 +190,140 @@ fun EventDetailsContent(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-            } else {
-                Text("No Image Available", color = Color.Gray)
+                else -> Text("No Image Available", color = Color.Gray)
             }
         }
 
-        // Event Details Card
+        // MAIN CARD
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
-                // Event Name
+            Column(modifier = Modifier.padding(20.dp)) {
+
                 Text(
-                    text = event.name ?: "Event Name",
+                    text = event.name ?: "",
                     fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
-                // Event Description/Caption
                 Text(
-                    text = event.description ?: event.caption ?: "No description available",
+                    text = event.description ?: event.caption ?: "",
                     fontSize = 14.sp,
-                    color = Color.Gray,
-                    lineHeight = 20.sp
+                    color = Color.Gray
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
 
-                // Date Section
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                // Date
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = "Date",
-                        tint = Color(0xFF2196F3),
-                        modifier = Modifier.size(24.dp)
+                        Icons.Default.CalendarToday,
+                        contentDescription = "",
+                        tint = Color(0xFF2196F3)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(Modifier.width(12.dp))
+
                     Column {
-                        Text(
-                            text = "Date",
-                            fontSize = 12.sp,
-                            color = Color.Gray,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = formatDate(event.date),
-                            fontSize = 16.sp,
-                            color = Color.Black,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text("Date", color = Color.Gray)
+                        Text(formatDate(event.date))
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
 
-                Divider(color = Color.LightGray, thickness = 1.dp)
+                Divider()
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Venue Section
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                // Venue
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Venue",
-                        tint = Color(0xFF2196F3),
-                        modifier = Modifier.size(24.dp)
+                        Icons.Default.LocationOn,
+                        contentDescription = "",
+                        tint = Color(0xFF2196F3)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(Modifier.width(12.dp))
+
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Venue",
-                            fontSize = 12.sp,
-                            color = Color.Gray,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = event.venue ?: "Venue TBA",
-                            fontSize = 16.sp,
-                            color = Color.Black,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text("Venue", color = Color.Gray)
+                        Text(event.venue ?: "Venue TBA")
                     }
 
-                    // See On Maps Button
-                    OutlinedButton(
-                        onClick = { /* TODO: Implement maps functionality */ },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF2196F3)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "See On Maps",
-                            fontSize = 12.sp
-                        )
+                    OutlinedButton(onClick = {}) {
+                        Text("See On Maps", fontSize = 12.sp)
                     }
                 }
             }
         }
-        val context = LocalContext.current
-        // Buy Tickets Button
+
+        // BUY BUTTON
         Button(
             onClick = {
-                val intent = Intent(context, BuyTicketActivity::class.java).apply {
-                    putExtra("EVENT_ID", event.id) // Pass the event ID
-                }
-                context.startActivity(intent)            },
+                val intent = Intent(context, BuyTicketActivity::class.java)
+                intent.putExtra("EVENT_ID", event.id)
+                context.startActivity(intent)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFFFC107)
-            ),
-            shape = RoundedCornerShape(12.dp)
         ) {
-            Text(
-                text = "Buy Tickets",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
+            Text("Buy Tickets")
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // Additional Info Card (Artist, Genre, Price)
+        // Extra info
         if (event.artist != null || event.genre != null || event.price != null) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Text(
-                        text = "Event Information",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
+                Column(modifier = Modifier.padding(20.dp)) {
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Event Information", fontWeight = FontWeight.Bold)
 
-                    event.artist?.let { artist ->
-                        InfoRow(label = "Artist", value = artist)
-                        Spacer(modifier = Modifier.height(12.dp))
+                    event.artist?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Artist", it)
                     }
 
-                    event.genre?.let { genre ->
-                        InfoRow(label = "Genre", value = genre)
-                        Spacer(modifier = Modifier.height(12.dp))
+                    event.genre?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Genre", it)
                     }
 
-                    event.price?.let { price ->
-                        InfoRow(label = "Starting Price", value = "$${"%.2f".format(price)}")
+                    event.price?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Starting Price", "$${"%.2f".format(it)}")
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            text = value,
-            fontSize = 14.sp,
-            color = Color.Black,
-            fontWeight = FontWeight.Medium
-        )
+        Text(label, color = Color.Gray)
+        Text(value)
     }
 }
 
-fun formatDate(timestamp: com.google.firebase.Timestamp?): String {
-    if (timestamp == null) return "Date TBA"
-
-    return try {
-        val date = timestamp.toDate()
-        val format = SimpleDateFormat("EEE, MMM dd, yyyy 'at' hh:mm a", Locale.getDefault())
-        format.format(date)
-    } catch (e: Exception) {
-        "Date TBA"
-    }
+fun formatDate(ts: com.google.firebase.Timestamp?): String {
+    if (ts == null) return "Date TBA"
+    return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
+        .format(ts.toDate())
 }

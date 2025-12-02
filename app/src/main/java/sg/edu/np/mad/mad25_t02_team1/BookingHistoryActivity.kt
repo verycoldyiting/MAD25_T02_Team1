@@ -13,6 +13,7 @@ class BookingHistoryActivity : ComponentActivity() {
             MAD25_T02_Team1Theme {
                 // Only call the main scaffold, which contains the footer and the screen content.
                 BookingHistoryScaffold()
+
             }
         }
     }

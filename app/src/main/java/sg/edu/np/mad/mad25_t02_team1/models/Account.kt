@@ -9,8 +9,8 @@ data class Account(
     var name: String = "",
     @get:PropertyName("Email") @set:PropertyName("Email")
     var email: String = "",
-    @get:PropertyName("Phone Number") @set:PropertyName("Phone Number")
-    var phoneNumber: String = "",
+    @get:PropertyName("phone") @set:PropertyName("phone")
+    var phone: String = "",
     @get:PropertyName("CreatedAt") @set:PropertyName("CreatedAt")
     var createdAt: Timestamp? = null
 )

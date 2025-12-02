@@ -108,7 +108,7 @@ fun HomePageScaffold() {
             composable(BottomNavItem.Home.route) { HomePageContent() }
             composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
-            composable(BottomNavItem.Profile.route) {  }
+            composable(BottomNavItem.Profile.route) { ProfileScreen() }
         }
     }
 }

@@ -48,11 +48,11 @@
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
         <activity
-            android:name=".ui.screens.ProfileActivity"
+            android:name=".ProfileActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
         <activity
-            android:name=".ui.screens.EditProfileActivity"
+            android:name=".EditProfileActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
     </application>

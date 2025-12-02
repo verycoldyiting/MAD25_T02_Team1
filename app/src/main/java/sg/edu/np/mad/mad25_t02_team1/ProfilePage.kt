@@ -1,36 +1,32 @@
-package sg.edu.np.mad.mad25_t02_team1.ui.screens
+package sg.edu.np.mad.mad25_t02_team1
 
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import sg.edu.np.mad.mad25_t02_team1.models.Account
-import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
+import com.google.firebase.storage.FirebaseStorage
+import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
 class ProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MAD25_T02_Team1Theme {
-                ProfileScreen()
-            }
-        }
+        setContent { ProfileScreen() }
     }
 }
 
@@ -38,30 +34,34 @@ class ProfileActivity : ComponentActivity() {
 fun ProfileScreen() {
 
     val auth = FirebaseAuth.getInstance()
-    val uid = auth.currentUser?.uid ?: return
+    val user = auth.currentUser!!
+    val db = FirebaseFirestore.getInstance()
 
-    var account by remember { mutableStateOf<Account?>(null) }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    val email = user.email ?: ""
+    var imageUrl by remember { mutableStateOf("") }
 
-    // 🔥 Load from Firestore
-    LaunchedEffect(Unit) {
-        FirebaseFirestore.getInstance()
-            .collection("Account")
-            .whereEqualTo("uid", uid)
-            .get()
-            .addOnSuccessListener { snap ->
-                if (!snap.isEmpty) {
-                    account = snap.documents.first().toObject(Account::class.java)
+    val context = LocalContext.current
+
+    // AUTO REFRESH
+    LaunchedEffect(user.uid) {
+
+        db.collection("Account")
+            .whereEqualTo("uid", user.uid)
+            .addSnapshotListener { snap, _ ->
+
+                if (snap != null && !snap.isEmpty) {
+                    val doc = snap.documents[0]
+                    name = doc.getString("name") ?: ""
+                    phone = doc.getString("phone") ?: ""
                 }
             }
-    }
 
-
-
-    if (account == null) {
-        Box(Modifier.fillMaxSize(), Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
+        FirebaseStorage.getInstance()
+            .reference.child("profile/${user.uid}.jpg")
+            .downloadUrl
+            .addOnSuccessListener { imageUrl = it.toString() }
     }
 
     Column(
@@ -71,19 +71,34 @@ fun ProfileScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
+        AsyncImage(
+            model = imageUrl.ifEmpty { "https://via.placeholder.com/150" },
+            contentDescription = "",
+            modifier = Modifier
+                .size(130.dp)
+                .clip(CircleShape)
+                .background(Color.LightGray)
+        )
+
         Spacer(Modifier.height(20.dp))
 
-        ProfileText("Name", account!!.name)
-        ProfileText("Phone Number", account!!.phone)
-        ProfileText("Email", account!!.email)
+        Text(name, style = MaterialTheme.typography.headlineSmall)
+        Text(email)
+        Text(phone)
 
-        Spacer(Modifier.height(30.dp))
-        val context = LocalContext.current
+        Spacer(Modifier.height(35.dp))
+
         Button(
             onClick = {
                 context.startActivity(Intent(context, EditProfileActivity::class.java))
             },
-            modifier = Modifier.width(180.dp)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = YELLOW,
+                contentColor = Color.Black
+            ),
+            border = BorderStroke(1.dp, Color.Black),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.width(160.dp)
         ) {
             Text("Edit Profile")
         }
@@ -91,25 +106,19 @@ fun ProfileScreen() {
         Spacer(Modifier.height(12.dp))
 
         Button(
-            onClick = { FirebaseAuth.getInstance().signOut() },
-            modifier = Modifier.width(180.dp)
+            onClick = {
+                auth.signOut()
+                context.startActivity(Intent(context, LoginScreen::class.java))
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = YELLOW,
+                contentColor = Color.Black
+            ),
+            border = BorderStroke(1.dp, Color.Black),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.width(160.dp)
         ) {
             Text("Logout")
         }
-    }
-}
-
-@Composable
-fun ProfileText(label: String, value: String) {
-    Column(Modifier.fillMaxWidth().padding(4.dp)) {
-        Text(label, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-        Text(
-            value,
-            Modifier
-                .fillMaxWidth()
-                .background(Color(0xFFE0E0E0))
-                .padding(12.dp),
-            color = Color.Black
-        )
     }
 }

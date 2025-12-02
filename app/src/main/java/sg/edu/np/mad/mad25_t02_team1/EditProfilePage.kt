@@ -1,38 +1,38 @@
-package sg.edu.np.mad.mad25_t02_team1.ui.screens
+package sg.edu.np.mad.mad25_t02_team1
 
+import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
-import sg.edu.np.mad.mad25_t02_team1.models.Account
-import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
+import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
 class EditProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MAD25_T02_Team1Theme {
-                EditProfileScreen()
-            }
-        }
+        setContent { EditProfileScreen() }
     }
 }
 
@@ -40,102 +40,131 @@ class EditProfileActivity : ComponentActivity() {
 fun EditProfileScreen() {
 
     val auth = FirebaseAuth.getInstance()
-    val uid = auth.currentUser?.uid ?: return
+    val user = auth.currentUser!!
+    val db = FirebaseFirestore.getInstance()
 
-    var accountId by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var profileImageUri by remember { mutableStateOf<Uri?>(null) }
+    val email = user.email ?: "" // cannot change
 
-    // 🔥 Pick Image
-    val pickImageLauncher = rememberLauncherForActivityResult(
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var existingImageUrl by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+
+    val pickImage = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri ->
-        profileImageUri = uri
-    }
+    ) { uri -> selectedImageUri = uri }
 
-    // 🔥 Load Account
+    // Load profile
     LaunchedEffect(Unit) {
-        FirebaseFirestore.getInstance()
-            .collection("Account")
-            .whereEqualTo("uid", uid)
+        db.collection("Account")
+            .whereEqualTo("uid", user.uid)
             .get()
             .addOnSuccessListener { snap ->
                 if (!snap.isEmpty) {
-                    val doc = snap.documents.first()
-                    val acc = doc.toObject(Account::class.java)
-                    if (acc != null) {
-                        accountId = doc.id
-                        name = acc.name
-                        phone = acc.phone
-                        email = acc.email
-                    }
+                    val doc = snap.documents[0]
+                    name = doc.getString("name") ?: ""
+                    phone = doc.getString("phone") ?: ""
                 }
             }
+
+        FirebaseStorage.getInstance()
+            .reference.child("profile/${user.uid}.jpg")
+            .downloadUrl
+            .addOnSuccessListener { existingImageUrl = it.toString() }
     }
 
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Scaffold(
+        topBar = { TicketLahHeader() }
+    ) { innerPadding ->
 
-        // Profile Image
-        AsyncImage(
-            model = profileImageUri ?: "https://via.placeholder.com/150",
-            contentDescription = "",
+        Column(
             modifier = Modifier
-                .size(130.dp)
-                .clip(CircleShape)
-                .background(Color.LightGray)
-                .clickable { pickImageLauncher.launch("image/*") },
-            contentScale = ContentScale.Crop
-        )
+                .padding(innerPadding)
+                .fillMaxSize()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
-        Spacer(Modifier.height(20.dp))
+            AsyncImage(
+                model = selectedImageUri ?: existingImageUrl ?: "https://via.placeholder.com/150",
+                contentDescription = null,
+                modifier = Modifier
+                    .size(130.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray)
+                    .clickable { pickImage.launch("image/*") }
+            )
 
-        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(20.dp))
 
-        OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone Number") })
-        Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") }
+            )
 
-        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
+            Spacer(Modifier.height(10.dp))
 
-        Spacer(Modifier.height(25.dp))
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it },
+                label = { Text("Phone Number") }
+            )
 
-        Button(
-            modifier = Modifier.width(180.dp),
-            onClick = {
-                val updateData = mapOf(
-                    "name" to name,
-                    "phone" to phone,
-                    "email" to email
-                )
+            Spacer(Modifier.height(10.dp))
 
-                FirebaseFirestore.getInstance()
-                    .collection("Account")
-                    .document(accountId)
-                    .update(updateData)
+            OutlinedTextField(
+                value = email,
+                onValueChange = {},
+                enabled = false,
+                label = { Text("Email (cannot change)") }
+            )
 
-                profileImageUri?.let { uri ->
-                    FirebaseStorage.getInstance()
-                        .reference
-                        .child("profile/$accountId.jpg")
-                        .putFile(uri)
-                }
+            Spacer(Modifier.height(25.dp))
+
+            Button(
+                onClick = {
+
+                    db.collection("Account")
+                        .whereEqualTo("uid", user.uid)
+                        .get()
+                        .addOnSuccessListener { snap ->
+                            if (!snap.isEmpty) {
+                                val docId = snap.documents[0].id
+
+                                db.collection("Account").document(docId)
+                                    .update(
+                                        mapOf(
+                                            "name" to name,
+                                            "phone" to phone,
+                                            "email" to email
+                                        )
+                                    )
+                            }
+                        }
+
+                    selectedImageUri?.let { uri ->
+                        FirebaseStorage.getInstance()
+                            .reference.child("profile/${user.uid}.jpg")
+                            .putFile(uri)
+                    }
+
+                    Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+
+                    (context as Activity).finish()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = YELLOW,
+                    contentColor = Color.Black
+                ),
+                border = BorderStroke(1.dp, Color.Black),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.width(160.dp)
+            ) {
+                Text("Save Changes")
             }
-        ) {
-            Text("Save Changes")
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        Button(
-            modifier = Modifier.width(180.dp),
-            onClick = { FirebaseAuth.getInstance().sendPasswordResetEmail(email) }
-        ) {
-            Text("Reset Password")
         }
     }
 }

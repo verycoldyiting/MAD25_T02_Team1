@@ -195,9 +195,27 @@ Entertainment
 # Planned task(s) and feature(s) allocation of each member in the team for Stage 2.
 # Stage 2 Implementation:
 Natalie -
+1. Profile picture upload, password update and validation, and forget password
+* Uploading of profile picture and editing of email and password which once saved will be updated to FireStore and FireBase Authentication
+  
+2. Add Event to Calendar
+* Displays all details of an event, including title, artist, genre, venue, 
+description, price, date and time and general sales period.
+
+3. QR Code implementation
+* Generating Qr Code that contains all the booking details and retrieving all booking details once scanned. 
 
 Valerie -
+1. Chatbot
+* Allows message sending, voice input, and data retrieval with smart replies. It detects and translates languages, matches messages with artist info and events, responds to greetings, uses Levenshtein distance for keyword matching, provides smart replies, shows translated prompts, and cleans messages.
 
 Yuhong -
+1. Google Maps and Places API
+* Displays Google Maps fragment and map pin of venue. Opens Google Maps application for navigation. Displays venue details and nearby places with Places API.
 
 Daphne -
+1. Biometric Login
+* Account information is checked through Firebase Authentication. Includes forget password
+  
+2. Auto Fill payment page
+* Enables users to instantly populate their card information using fingerprint authentication, removing the need to manually type payment details.

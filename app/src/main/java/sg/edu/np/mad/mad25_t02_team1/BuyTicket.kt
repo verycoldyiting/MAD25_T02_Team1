@@ -2,7 +2,6 @@ package sg.edu.np.mad.mad25_t02_team1
 
 import android.content.Intent
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,7 +17,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -32,7 +30,7 @@ import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 import java.util.Locale
 
 @Composable
-fun BuyTicketScreen(navController: NavController) {
+fun BuyTicketScreen() {
 
     val activity = LocalContext.current as ComponentActivity
     val eventId = activity.intent.getStringExtra("EVENT_ID") ?: ""
@@ -47,7 +45,6 @@ fun BuyTicketScreen(navController: NavController) {
     var isLoadingImage by remember { mutableStateOf(true) }
 
     var allSeatCategories by remember { mutableStateOf<List<SeatCategory>>(emptyList()) }
-    var isLoadingCategories by remember { mutableStateOf(true) }
 
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showSectionMenu by remember { mutableStateOf(false) }
@@ -73,7 +70,6 @@ fun BuyTicketScreen(navController: NavController) {
             imageUrl = null
         } finally {
             isLoadingImage = false
-            isLoadingCategories = false
         }
     }
 

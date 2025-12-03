@@ -1,6 +1,5 @@
 package sg.edu.np.mad.mad25_t02_team1.ui
 
-import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

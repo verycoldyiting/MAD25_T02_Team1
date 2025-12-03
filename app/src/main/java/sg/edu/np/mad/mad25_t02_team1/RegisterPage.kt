@@ -17,6 +17,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import android.content.Intent
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +27,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
@@ -109,12 +114,24 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            var passwordVisible by remember { mutableStateOf(false) }
+
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, null) },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Confirm Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(icon, contentDescription = if (passwordVisible) "Hide password" else "Show password")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (passwordVisible)
+                    VisualTransformation.None
+                else
+                    PasswordVisualTransformation()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -122,9 +139,19 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = { Text("Re-enter Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, null) },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(icon, contentDescription = if (passwordVisible) "Hide password" else "Show password")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (passwordVisible)
+                    VisualTransformation.None
+                else
+                    PasswordVisualTransformation()
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -135,6 +162,11 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                     if (name.isBlank() || email.isBlank() || phone.isBlank() ||
                         password.isBlank() || confirmPassword.isBlank()) {
                         errorMessage = "Please fill in all fields"
+                        return@Button
+                    }
+
+                    if (!isValidPhone(phone)) {
+                        Toast.makeText(context, "Phone must start with 8 or 9 and be 8 digits.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
@@ -233,4 +265,8 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+fun isValidPhone(phone: String): Boolean {
+    return phone.matches(Regex("^[89][0-9]{7}$"))
 }

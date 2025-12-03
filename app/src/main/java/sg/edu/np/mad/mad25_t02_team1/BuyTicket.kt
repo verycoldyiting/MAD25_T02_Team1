@@ -79,7 +79,6 @@ fun BuyTicketScreen(navController: NavController) {
 
     val totalPrice = (selectedCategory?.price ?: 0.0) * (quantity.toIntOrNull() ?: 0)
 
-    // -------- UI --------
     Scaffold(
 
         topBar = {
@@ -88,8 +87,7 @@ fun BuyTicketScreen(navController: NavController) {
                     .fillMaxWidth()
             ) {
                 TicketLahHeader()
-                var onBackPressed = { finish() }
-                // Beautiful Back Button
+                var onBackPressed = { (context as? ComponentActivity)?.finish()?: Unit }
                 IconButton(
                     onClick = onBackPressed,
                     modifier = Modifier
@@ -192,7 +190,7 @@ fun BuyTicketScreen(navController: NavController) {
                     text = event!!.name ?: "",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp).padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(top = 32.dp, bottom = 32.dp).padding(horizontal = 8.dp),
                     textAlign = TextAlign.Center
                 )
             }
@@ -316,6 +314,4 @@ fun BuyTicketScreen(navController: NavController) {
     }
 }
 
-private fun BoxScope.finish() {
-    TODO("Not yet implemented")
-}
+

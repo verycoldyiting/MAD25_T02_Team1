@@ -46,7 +46,6 @@ import java.util.*
 import com.google.android.gms.tasks.Task
 
 
-
 @Composable
 fun BookingHistoryScaffold() {
     val navController = rememberNavController()
@@ -110,16 +109,12 @@ fun BookingHistoryScreen() {
         try {
             val db = FirebaseFirestore.getInstance()
 
-            // --- STEP 1: FIND THE CUSTOM ACCOUNT DOCUMENT ID (e.g., "A001") ---
-            // Query the /Account collection to find the document where the 'uid' field matches the current Firebase UID.
-            // (Assumes Account documents have a field named 'uid' matching the Firebase UID)
             val accountQuerySnapshot = db.collection("Account")
                 .whereEqualTo("uid", firebaseUid)
                 .limit(1)
                 .get()
                 .await()
 
-            // Extract the actual Document ID (e.g., "A001") which is the custom AccID
             val resolvedCustomAccId = accountQuerySnapshot.documents.firstOrNull()?.id
 
             // If the custom Account ID cannot be resolved, stop.
@@ -231,7 +226,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
             Surface(
@@ -242,14 +237,11 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             ) {
                 Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        // FIX: Added null/empty checks using orEmpty()
                         DetailText("Category:", booking.category.orEmpty().ifEmpty { "N/A" })
                         DetailText("Seat:", booking.section.orEmpty().ifEmpty { "N/A" })
-                        // FIX: Use Elvis operator for safe quantity display
                         DetailText("Quantity:", (booking.quantity ?: 0).toString())
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        // FIX: Added null/empty checks
                         DetailText("Payment:", booking.paymentMethod.orEmpty().ifEmpty { "N/A" })
                         Spacer(Modifier.height(8.dp))
 

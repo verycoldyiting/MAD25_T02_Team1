@@ -126,6 +126,10 @@ fun EditProfileScreen() {
 
             Button(
                 onClick = {
+                    if (!isValidPhone(phone)) {
+                        Toast.makeText(context, "Phone must start with 8 or 9 and be 8 digits.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
 
                     db.collection("Account")
                         .whereEqualTo("uid", user.uid)

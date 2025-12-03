@@ -26,6 +26,7 @@ import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.SeatCategory
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
@@ -33,13 +34,12 @@ import java.util.Locale
 fun BuyTicketScreen(navController: NavController) {
 
     val activity = LocalContext.current as ComponentActivity
+    val eventId = activity.intent.getStringExtra("EVENT_ID") ?: ""
     val context = LocalContext.current
-
-    val eventId = remember { activity.intent.getStringExtra("EVENT_ID") ?: "" }
 
     var event by remember { mutableStateOf<Event?>(null) }
     var selectedCategory by remember { mutableStateOf<SeatCategory?>(null) }
-    var selectedSectionId by remember { mutableStateOf<String?>(null) }
+    var selectedSection by remember { mutableStateOf<String?>(null) }
     var quantity by remember { mutableStateOf("1") }
 
     var imageUrl by remember { mutableStateOf<String?>(null) }
@@ -133,7 +133,7 @@ fun BuyTicketScreen(navController: NavController) {
                         }
 
                         Button(
-                            enabled = selectedCategory != null && selectedSectionId != null,
+                            enabled = selectedCategory != null && selectedSection != null,
                             onClick = {
 
                                 val intent = Intent(context, PaymentPage::class.java).apply {
@@ -143,7 +143,7 @@ fun BuyTicketScreen(navController: NavController) {
                                     putExtra("dateMillis", event?.date?.toDate()?.time ?: 0L)
                                     putExtra("venue", event?.venue ?: "")
                                     putExtra("category", selectedCategory?.category)
-                                    putExtra("section", selectedSectionId)
+                                    putExtra("section", selectedSection)
                                     putExtra("quantity", quantity.toIntOrNull() ?: 1)
                                     putExtra("pricePerTicket", selectedCategory?.price ?: 0.0)
                                     putExtra("TOTAL_PRICE", totalPrice)
@@ -187,14 +187,15 @@ fun BuyTicketScreen(navController: NavController) {
                     text = event!!.name ?: "",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp).padding(horizontal = 16.dp),
+                    textAlign = TextAlign.Center
                 )
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp)
             ) {
 
                 // -------- CATEGORY --------
@@ -221,7 +222,7 @@ fun BuyTicketScreen(navController: NavController) {
                                 text = { Text(cat.category) },
                                 onClick = {
                                     selectedCategory = cat
-                                    selectedSectionId = null
+                                    selectedSection = null
                                     showCategoryMenu = false
                                 }
                             )
@@ -245,10 +246,10 @@ fun BuyTicketScreen(navController: NavController) {
                 // -------- SECTION --------
                 Box(Modifier.fillMaxWidth()) {
                     OutlinedTextField(
-                        value = selectedSectionId ?: "Select Section ID",
+                        value = selectedSection ?: "Select Section",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Section ID") },
+                        label = { Text("Section") },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -265,7 +266,7 @@ fun BuyTicketScreen(navController: NavController) {
                             DropdownMenuItem(
                                 text = { Text(sec) },
                                 onClick = {
-                                    selectedSectionId = sec
+                                    selectedSection = sec
                                     showSectionMenu = false
                                 }
                             )

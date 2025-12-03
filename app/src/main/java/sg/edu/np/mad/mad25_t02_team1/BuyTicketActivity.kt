@@ -12,8 +12,7 @@ class BuyTicketActivity : ComponentActivity() {
 
         setContent {
             MAD25_T02_Team1Theme {
-                val navController = rememberNavController()
-                BuyTicketScreen(navController)
+                BuyTicketScreen()
 
             }
         }

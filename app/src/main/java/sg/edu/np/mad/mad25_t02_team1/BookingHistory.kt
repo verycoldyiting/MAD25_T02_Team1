@@ -32,7 +32,6 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.BottomNavItem
 import sg.edu.np.mad.mad25_t02_team1.BottomNavigationBar
@@ -43,7 +42,6 @@ import sg.edu.np.mad.mad25_t02_team1.models.Event
 import sg.edu.np.mad.mad25_t02_team1.ExploreEventsApp
 import java.text.SimpleDateFormat
 import java.util.*
-import com.google.android.gms.tasks.Task
 
 
 @Composable
@@ -94,7 +92,7 @@ fun BookingHistoryScreen() {
     var bookingWithEvents by remember { mutableStateOf<List<Pair<Booking, Event?>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // 1. Get the Firebase UID
+    // Get the Firebase UID
     val firebaseUid = FirebaseAuth.getInstance().currentUser?.uid
 
     // LaunchedEffect runs when the Firebase UID changes (i.e., user logs in)
@@ -124,7 +122,7 @@ fun BookingHistoryScreen() {
                 return@LaunchedEffect
             }
 
-            // --- STEP 2: FETCH BOOKINGS USING THE DocumentReference to the Account ---
+            // FETCH BOOKINGS USING THE DocumentReference to the Account
             // Construct the DocumentReference using the resolved custom ID
             val accountRef = db.document("/Account/$resolvedCustomAccId")
 
@@ -175,7 +173,6 @@ fun BookingHistoryScreen() {
     }
 }
 
-@SuppressLint("DefaultLocale")
 @Composable
 fun BookingHistoryItem(booking: Booking, event: Event?) {
     Card(
@@ -238,7 +235,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                 Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         DetailText("Category:", booking.category.orEmpty().ifEmpty { "N/A" })
-                        DetailText("Seat:", booking.section.orEmpty().ifEmpty { "N/A" })
+                        DetailText("Seatt:", booking.section.orEmpty().ifEmpty { "N/A" })
                         DetailText("Quantity:", (booking.quantity ?: 0).toString())
                     }
                     Column(horizontalAlignment = Alignment.End) {
@@ -285,7 +282,6 @@ fun EventImage(rawUrl: String?) {
         val cleanedUrl = rawUrl?.trim()
 
         if (cleanedUrl.isNullOrBlank()) {
-            // FIX: Set loadingError true if URL is blank/null so placeholder appears
             loadingError = true
             return@LaunchedEffect
         }

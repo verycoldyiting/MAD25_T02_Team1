@@ -40,6 +40,7 @@ import sg.edu.np.mad.mad25_t02_team1.TicketLahHeader
 import sg.edu.np.mad.mad25_t02_team1.models.Booking
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import sg.edu.np.mad.mad25_t02_team1.ExploreEventsApp
+import sg.edu.np.mad.mad25_t02_team1.ProfileScreen
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -81,7 +82,7 @@ fun BookingHistoryScaffold() {
             composable(BottomNavItem.Home.route) { HomePageContent() }
             composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
-            composable(BottomNavItem.Profile.route) { Text("Profile Screen") }
+            composable(BottomNavItem.Profile.route) { ProfileScreen() }
         }
     }
 }

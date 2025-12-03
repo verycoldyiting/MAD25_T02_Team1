@@ -18,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +39,7 @@ class PaymentPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Receive all event details passed from previous page
         val eventId = intent.getStringExtra("eventId") ?: ""
         val title = intent.getStringExtra("title") ?: ""
         val artist = intent.getStringExtra("artist") ?: ""
@@ -50,6 +50,7 @@ class PaymentPage : ComponentActivity() {
         val quantity = intent.getIntExtra("quantity", 1)
         val pricePerTicket = intent.getDoubleExtra("pricePerTicket", 0.0)
 
+        // Load UI
         setContent {
             MAD25_T02_Team1Theme {
                 Surface {
@@ -88,15 +89,15 @@ fun PaymentScreen(
     val auth = FirebaseAuth.getInstance()
     val scope = rememberCoroutineScope()
 
-    // Account state
+    // Firestore account info
     var accountId by remember { mutableStateOf<String?>(null) }
     var accountError by remember { mutableStateOf<String?>(null) }
     var accountLoading by remember { mutableStateOf(true) }
 
-    // General error message for payment failures
+    // Error shown when payment fails
     var paymentError by remember { mutableStateOf<String?>(null) }
 
-    // Validate incoming required data (event and ticket details)
+    // Validate the event data passed through Intent
     val initialInputError = remember(eventId, quantity, pricePerTicket) {
         when {
             eventId.isBlank() -> "Missing event information. Please go back and select the event again."
@@ -106,7 +107,7 @@ fun PaymentScreen(
         }
     }
 
-    // Load account from Firestore with proper error handling
+    // Load account from Firestore
     LaunchedEffect(Unit) {
         try {
             val uid = auth.currentUser?.uid
@@ -121,6 +122,7 @@ fun PaymentScreen(
                 .await()
 
             if (!snapshot.isEmpty) {
+                // Get "accountId" field from Firestore document
                 val doc = snapshot.documents.first()
                 accountId = doc.getString("accountId")
                 if (accountId.isNullOrBlank()) {
@@ -136,21 +138,21 @@ fun PaymentScreen(
         }
     }
 
-    // Card fields
+    // Card inputs
     var cardName by remember { mutableStateOf("") }
     var cardNumber by remember { mutableStateOf("") }
     var expiryMonth by remember { mutableStateOf("") }
     var expiryYear by remember { mutableStateOf("") }
     var cvv by remember { mutableStateOf("") }
 
-    // Billing fields
+    // Billing address inputs
     var billingName by remember { mutableStateOf("") }
     var addressLine1 by remember { mutableStateOf("") }
     var postalCode by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("Singapore") }
 
-    // Promo
+    // Promo code state
     var promoInput by remember { mutableStateOf("") }
     var appliedPromo by remember { mutableStateOf<String?>(null) }
     var discountAmount by remember { mutableStateOf(0.0) }
@@ -160,11 +162,12 @@ fun PaymentScreen(
     var isProcessing by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    // Money
+    // Money calculation
     val subtotal = quantity * pricePerTicket
     val bookingFee = if (subtotal == 0.0) 0.0 else 3.5
     val finalTotal = (subtotal + bookingFee - discountAmount).coerceAtLeast(0.0)
 
+    // Format event date
     val dateText = if (dateMillis == 0L) {
         "Date TBA"
     } else {
@@ -181,6 +184,7 @@ fun PaymentScreen(
             ) {
                 TicketLahHeader()
 
+                // Back button
                 IconButton(
                     onClick = { activity?.finish() },
                     modifier = Modifier
@@ -208,7 +212,7 @@ fun PaymentScreen(
                 .background(Color(0xFFF2F4F7))
         ) {
             when {
-                // 1. Input error from navigation
+                // 1. Incorrect data coming from previous page
                 initialInputError != null -> {
                     Column(
                         modifier = Modifier
@@ -232,7 +236,7 @@ fun PaymentScreen(
                     }
                 }
 
-                // 2. Account loading
+                // 2. Loading Firestore account
                 accountLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -242,7 +246,7 @@ fun PaymentScreen(
                     }
                 }
 
-                // 3. Account error
+                // 3. Account not found or error
                 accountError != null || accountId.isNullOrBlank() -> {
                     Column(
                         modifier = Modifier
@@ -280,6 +284,7 @@ fun PaymentScreen(
 
                         Spacer(Modifier.height(8.dp))
 
+                        // Event summary card
                         EventSummaryCard(
                             title = title,
                             artist = artist,
@@ -292,6 +297,7 @@ fun PaymentScreen(
 
                         Spacer(Modifier.height(12.dp))
 
+                        // Price breakdown + promo code
                         PriceCardWithPromo(
                             subtotal = subtotal,
                             bookingFee = bookingFee,
@@ -317,6 +323,8 @@ fun PaymentScreen(
 
                         Spacer(Modifier.height(12.dp))
 
+
+                        // Card details section
                         CardDetailsSection(
                             cardName, { cardName = it },
                             cardNumber, { cardNumber = it },
@@ -327,6 +335,7 @@ fun PaymentScreen(
 
                         Spacer(Modifier.height(12.dp))
 
+                        // Billing address
                         BillingAddressSection(
                             billingName, { billingName = it },
                             addressLine1, { addressLine1 = it },
@@ -355,36 +364,37 @@ fun PaymentScreen(
                             text = "Buy now • \$${String.format("%.2f", finalTotal)}",
                             enabled = !isProcessing
                         ) {
-                            // Validate card
+                            // Validate card inputs
                             if (!validateCard(cardName, cardNumber, expiryMonth, expiryYear, cvv)) {
                                 Toast.makeText(context, "Check your card details", Toast.LENGTH_SHORT).show()
                                 return@PrimaryGradientButton
                             }
 
-                            // Validate billing
+                            // Validate billing address
                             if (billingName.isBlank() || addressLine1.isBlank() || postalCode.isBlank()) {
                                 Toast.makeText(context, "Billing address required", Toast.LENGTH_SHORT).show()
                                 return@PrimaryGradientButton
                             }
 
-                            // Extra sanity check before writing to Firestore
+                            // Firestore must have account loaded
                             if (accountId.isNullOrBlank()) {
                                 paymentError = "Your account is not available. Please try again."
                                 return@PrimaryGradientButton
                             }
-
+                            // Start Firestore booking write
                             scope.launch {
                                 isProcessing = true
                                 paymentError = null
                                 try {
                                     val bookingId = generateBookingId()
 
+                                    // Convert event data to Firestore timestamp
                                     val eventTime = if (dateMillis == 0L) {
                                         Timestamp.now()
                                     } else {
                                         Timestamp(Date(dateMillis))
                                     }
-
+                                    // Create Firestore booking document
                                     val bookingData = hashMapOf(
                                         "AccID" to db.document("Account/$accountId"),
                                         "Category" to category,
@@ -398,6 +408,8 @@ fun PaymentScreen(
                                         "Section" to section,
                                         "TotalPrice" to finalTotal
                                     )
+
+                                    //Save document
 
                                     db.collection("BookingDetails")
                                         .document(bookingId)
@@ -492,7 +504,6 @@ private fun EventSummaryCard(
             Text(dateText)
             Text(venue)
             Spacer(Modifier.height(8.dp))
-            Divider()
             Spacer(Modifier.height(8.dp))
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,

@@ -29,7 +29,7 @@ Entertainment
 # TicketLah! App Stage 1 Features:
 ## Login/Register Page [Daphne Cheng]
 1. Login/Register Fragment:
-* Provides a fragment that allows users to choose to login or register.
+* Provides a page that allows users to choose to login or register.
 * Offers a seamless transition between login and registration forms.
 
 2. Firebase Integration:
@@ -37,10 +37,6 @@ Entertainment
 * Newly created accounts are updated in Firebase for secure management using Firebase Authentication.
 * Ensures user data is managed safely and efficiently, leveraging Firebase's robust authentication mechanisms.
 
-3. Forget Password Option:
-* Available in the login fragment.
-* Prompts a dialogue box asking users for their email.
-* Users can press the cross to exit the dialogue.
 
 ## Profile Page [Daphne Cheng]
 1. View Account Information:

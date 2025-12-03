@@ -1,7 +1,6 @@
 package sg.edu.np.mad.mad25_t02_team1
 
 import android.app.Activity
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -39,36 +38,41 @@ class EditProfileActivity : ComponentActivity() {
 @Composable
 fun EditProfileScreen() {
 
+    //firebase setup
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser!!
     val db = FirebaseFirestore.getInstance()
 
+    //store value
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     val email = user.email ?: "" // cannot change
+
 
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var existingImageUrl by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
 
+    //image picker setup
     val pickImage = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri -> selectedImageUri = uri }
 
-    // Load profile
+    // load profile
     LaunchedEffect(Unit) {
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
             .get()
             .addOnSuccessListener { snap ->
                 if (!snap.isEmpty) {
+                    //load from firestore
                     val doc = snap.documents[0]
                     name = doc.getString("name") ?: ""
                     phone = doc.getString("phone") ?: ""
                 }
             }
-
+        //load from firestore
         FirebaseStorage.getInstance()
             .reference.child("profile/${user.uid}.jpg")
             .downloadUrl
@@ -99,6 +103,7 @@ fun EditProfileScreen() {
 
             Spacer(Modifier.height(20.dp))
 
+            //editable field
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -131,6 +136,7 @@ fun EditProfileScreen() {
                         return@Button
                     }
 
+                    //update firestore
                     db.collection("Account")
                         .whereEqualTo("uid", user.uid)
                         .get()
@@ -155,9 +161,10 @@ fun EditProfileScreen() {
                             .putFile(uri)
                     }
 
+                    //pop-up message
                     Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
 
-                    (context as Activity).finish()
+                    (context as Activity).finish() //close the screen
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = YELLOW,

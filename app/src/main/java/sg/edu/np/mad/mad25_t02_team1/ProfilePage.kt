@@ -33,10 +33,12 @@ class ProfileActivity : ComponentActivity() {
 @Composable
 fun ProfileScreen() {
 
+    //firebase setup
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser!!
     val db = FirebaseFirestore.getInstance()
 
+    //will recompose the screen whenever these values change
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     val email = user.email ?: ""
@@ -44,20 +46,21 @@ fun ProfileScreen() {
 
     val context = LocalContext.current
 
-    // AUTO REFRESH
+    //auto refresh
     LaunchedEffect(user.uid) {
 
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
             .addSnapshotListener { snap, _ ->
 
+                //listen to firestore account document
                 if (snap != null && !snap.isEmpty) {
                     val doc = snap.documents[0]
                     name = doc.getString("name") ?: ""
                     phone = doc.getString("phone") ?: ""
                 }
             }
-
+        //load profile image from firebase
         FirebaseStorage.getInstance()
             .reference.child("profile/${user.uid}.jpg")
             .downloadUrl
@@ -90,6 +93,7 @@ fun ProfileScreen() {
 
         Button(
             onClick = {
+                //brings u to edit profile page
                 context.startActivity(Intent(context, EditProfileActivity::class.java))
             },
             colors = ButtonDefaults.buttonColors(
@@ -107,8 +111,8 @@ fun ProfileScreen() {
 
         Button(
             onClick = {
-                auth.signOut()
-                context.startActivity(Intent(context, LoginScreen::class.java))
+                auth.signOut() //sign user out of firebase auth
+                context.startActivity(Intent(context, LoginScreen::class.java)) //redirect to login page
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = YELLOW,

@@ -50,16 +50,20 @@ class RegisterPage : ComponentActivity() {
 @Composable
 fun RegisterScreen(modifier: Modifier = Modifier) {
 
+    //store user input
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
 
+    //visibility of the pop up message
     var showSuccessDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
+
+    //for authentication
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
@@ -122,6 +126,7 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 label = { Text("Confirm Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
+                    //visibility of the password
                     val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(icon, contentDescription = if (passwordVisible) "Hide password" else "Show password")
@@ -159,27 +164,32 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
             Button(
                 onClick = {
 
+                    //check for empty fields
                     if (name.isBlank() || email.isBlank() || phone.isBlank() ||
                         password.isBlank() || confirmPassword.isBlank()) {
                         errorMessage = "Please fill in all fields"
                         return@Button
                     }
 
+                    //check if phone num is valid
                     if (!isValidPhone(phone)) {
-                        Toast.makeText(context, "Phone must start with 8 or 9 and be 8 digits.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Phone Number must start with 8 or 9 and be 8 digits.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
+                    //check if passwords match anot
                     if (password != confirmPassword) {
                         errorMessage = "Passwords do not match"
                         return@Button
                     }
 
+                    //create firebase auth user
                     auth.createUserWithEmailAndPassword(email, password)
                         .addOnSuccessListener { result ->
 
                             val uid = result.user?.uid ?: return@addOnSuccessListener
 
+                            //generate next accountID
                             db.collection("Account")
                                 .orderBy("accountId", com.google.firebase.firestore.Query.Direction.DESCENDING)
                                 .limit(1)
@@ -203,11 +213,12 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                                         "phone" to phone
                                     )
 
+                                    //save the user in firestore
                                     db.collection("Account")
                                         .document(newAccountId)
                                         .set(userData)
                                         .addOnSuccessListener {
-                                            showSuccessDialog = true
+                                            showSuccessDialog = true //show success message
                                         }
                                         .addOnFailureListener {
                                             errorMessage = it.message
@@ -234,6 +245,7 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 Text("Register Now")
             }
 
+            //error dialogue
             errorMessage?.let { msg ->
                 AlertDialog(
                     onDismissRequest = { errorMessage = null },
@@ -247,6 +259,7 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 )
             }
 
+            //success dialogue
             if (showSuccessDialog) {
                 AlertDialog(
                     onDismissRequest = { },
@@ -268,5 +281,5 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
 }
 
 fun isValidPhone(phone: String): Boolean {
-    return phone.matches(Regex("^[89][0-9]{7}$"))
+    return phone.matches(Regex("^[89][0-9]{7}$")) //regex pattern for 8/9 followed by 7 digits
 }

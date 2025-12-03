@@ -1,8 +1,6 @@
 package sg.edu.np.mad.mad25_t02_team1
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,8 +32,6 @@ fun TicketLahHeader() {
                 contentDescription = "TicketLah Logo",
                 modifier = Modifier.size(150.dp) // Perfect size
             )
-
-            // Spacer(Modifier.width(1.dp))
 
         }
     }

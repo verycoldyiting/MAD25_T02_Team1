@@ -28,6 +28,7 @@ import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 import java.util.Locale
 
 @Composable
@@ -150,7 +151,11 @@ fun BuyTicketScreen(navController: NavController) {
                                 }
 
                                 context.startActivity(intent)
-                            }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = YELLOW,
+                                contentColor = Color.Black
+                            )
                         ) {
                             Text("Book Now")
                         }

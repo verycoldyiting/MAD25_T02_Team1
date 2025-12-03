@@ -45,7 +45,7 @@ class EventDetailsActivity : ComponentActivity() {
             MAD25_T02_Team1Theme {
                 EventDetailsScreen(
                     eventId = eventId,
-                    onBackPressed = { finish() }
+                    onBackPressed = { finish() } // Closes activity when back is pressed }
                 )
             }
         }
@@ -64,7 +64,7 @@ fun EventDetailsScreen(
     var loadingImage by remember { mutableStateOf(true) }
     var imageError by remember { mutableStateOf<String?>(null) }
 
-    // Fetch Event
+    // Fetch Event details from Firestore based on eventId
     LaunchedEffect(eventId) {
         try {
             val doc = FirebaseFirestore.getInstance()
@@ -82,6 +82,7 @@ fun EventDetailsScreen(
     }
 
     // Load event image
+    // Logic to handle both direct HTTP links and Firebase Storage (gs://) paths
     LaunchedEffect(event?.eventImage) {
         loadingImage = true
         val rawUrl = event?.eventImage?.trim() ?: ""
@@ -170,6 +171,9 @@ fun EventDetailsScreen(
     }
 }
 
+/**
+ * Displays the content of the event once data is successfully loaded.
+ */
 @Composable
 fun EventDetailsContent(
     event: Event,
@@ -380,7 +384,9 @@ fun InfoRow(label: String, value: String) {
         Text(value, fontWeight = FontWeight.Medium, fontSize = 14.sp)
     }
 }
-
+/**
+ * Utility to format Firebase Timestamp into readable date string
+ */
 fun formatDate(ts: com.google.firebase.Timestamp?): String {
     if (ts == null) return "Date TBA"
     return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())

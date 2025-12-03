@@ -45,6 +45,7 @@ import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
 class ExploreEventActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Entry point: Setting the Compose content with the App Theme
         setContent {
             MAD25_T02_Team1Theme {
                 ExploreEventsScaffold()
@@ -53,13 +54,17 @@ class ExploreEventActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Main Scaffold Layout
+ * Handles the TopBar, BottomBar, and Navigation Graph logic.
+ */
 @Composable
 fun ExploreEventsScaffold() {
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Search) }
 
     Scaffold(
-        topBar = { TicketLahHeader() },
+        topBar = { TicketLahHeader() },  // Custom header component
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
@@ -75,9 +80,10 @@ fun ExploreEventsScaffold() {
         },
         containerColor = Color.White
     ) { innerPadding ->
+        // Defines the available routes (screens) within this activity
         NavHost(
             navController = navController,
-            startDestination = BottomNavItem.Search.route,
+            startDestination = BottomNavItem.Search.route, // Default landing screen
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
@@ -85,7 +91,7 @@ fun ExploreEventsScaffold() {
             }
 
             composable(BottomNavItem.Search.route) {
-                ExploreEventsApp()
+                ExploreEventsApp() // The main Explore functionality
             }
 
             composable(BottomNavItem.Tickets.route) {
@@ -98,9 +104,13 @@ fun ExploreEventsScaffold() {
         }
     }
 }
-
+/**
+ * ExploreEventsApp
+ * Contains the logic for fetching events, searching by artist, and filtering by genre.
+ */
 @Composable
 fun ExploreEventsApp() {
+    // State Hoisting: Managing UI state for search queries and data lists
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var allEvents by remember { mutableStateOf<List<Event>>(emptyList()) }
@@ -109,18 +119,24 @@ fun ExploreEventsApp() {
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
 
+    // Asynchronous Data Fetching:
+    // Runs once when the composable enters the composition.
+    // Fetches events from Firestore and populates the genre list dynamically.
+
     LaunchedEffect(Unit) {
         try {
             val db = FirebaseFirestore.getInstance()
+            // Coroutine suspend function call (.await()) to prevent blocking the UI thread
             val result = db.collection("Events").get().await()
 
             val fetchedEvents = result.documents.mapNotNull { document ->
                 document.toObject(Event::class.java)?.copy(
-                    id = document.id
+                    id = document.id // Ensure the ID is captured from the document metadata
                 )
             }
             allEvents = fetchedEvents
 
+            // Extract unique genres for the filter dropdown
             availableGenres = fetchedEvents.mapNotNull { it.genre }
                 .filter { it.isNotEmpty() }
                 .distinct()
@@ -130,12 +146,17 @@ fun ExploreEventsApp() {
         }
     }
 
+    // Reactive Filtering Logic:
+    // Recalculates 'displayedEvents' only when search, genre, or the list changes.
+    // This optimization ensures we don't re-filter on every single frame.
     val displayedEvents = remember(searchQuery, selectedGenre, allEvents) {
         allEvents.filter { event ->
+            // Search Requirement: Matches Artist OR Event Name
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 event.artist?.contains(searchQuery, ignoreCase = true) == true ||
                         event.name?.contains(searchQuery, ignoreCase = true) == true
             }
+            // Filter Requirement: Matches selected Genre
             val matchesGenre = if (selectedGenre == null) true else {
                 event.genre?.equals(selectedGenre, ignoreCase = true) == true
             }
@@ -152,6 +173,7 @@ fun ExploreEventsApp() {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
+            // UI Component: Search Bar + Filter Icon
             SearchBarWithFilter(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -163,6 +185,7 @@ fun ExploreEventsApp() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // LazyColumn: Efficiently renders only the visible items on screen
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
@@ -171,6 +194,7 @@ fun ExploreEventsApp() {
                     EventCard(
                         event = event,
                         onClick = {
+                            // Intent to navigate to Details page, passing the unique Event ID
                             val intent = Intent(context, EventDetailsActivity::class.java)
                             intent.putExtra("EVENT_ID", event.id)
                             context.startActivity(intent)
@@ -197,6 +221,7 @@ fun SearchBarWithFilter(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
+        // Standard Material TextField for user input
         TextField(
             value = query,
             onValueChange = onQueryChange,
@@ -219,11 +244,13 @@ fun SearchBarWithFilter(
 
         Spacer(modifier = Modifier.width(8.dp))
 
+        // Filter Dropdown logic
         Box {
             IconButton(onClick = { showMenu = true }) {
                 Icon(
                     imageVector = Icons.Outlined.FilterAlt,
                     contentDescription = "Filter",
+                    // Visual cue: Change color if a filter is active
                     tint = if (selectedGenre != null) MaterialTheme.colorScheme.primary else Color.Gray
                 )
             }
@@ -233,6 +260,7 @@ fun SearchBarWithFilter(
                 onDismissRequest = { showMenu = false },
                 modifier = Modifier.background(Color.White)
             ) {
+                // Option to reset filter
                 DropdownMenuItem(
                     text = { Text("All Genres", fontWeight = FontWeight.Bold) },
                     onClick = {
@@ -242,6 +270,7 @@ fun SearchBarWithFilter(
                 )
                 Divider()
 
+                // Dynamically list available genres
                 availableGenres.forEach { genre ->
                     DropdownMenuItem(
                         text = { Text(genre, color = if (selectedGenre == genre) MaterialTheme.colorScheme.primary else Color.Black) },
@@ -261,6 +290,7 @@ fun EventCard(
     event: Event,
     onClick: () -> Unit
 ) {
+    // To manage the final resolved image URL (handling gs:// vs https://)
     var finalImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoadingImage by remember { mutableStateOf(true) }
 
@@ -271,6 +301,7 @@ fun EventCard(
             isLoadingImage = false
             return@LaunchedEffect
         }
+        // If URL starts with gs://, we need to fetch the actual download URL
         finalImageUrl = if (rawUrl.startsWith("gs://")) {
             try {
                 val ref = FirebaseStorage.getInstance().getReferenceFromUrl(rawUrl)
@@ -302,6 +333,7 @@ fun EventCard(
                     .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
+                // Loading State vs Success State for Image
                 if (isLoadingImage) {
                     CircularProgressIndicator()
                 } else if (finalImageUrl != null) {
@@ -337,6 +369,7 @@ fun EventCard(
                 }
             }
 
+            // Event Details Section
             Column(modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp)) {

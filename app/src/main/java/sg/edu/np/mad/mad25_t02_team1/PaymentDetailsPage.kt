@@ -1,6 +1,7 @@
 package sg.edu.np.mad.mad25_t02_team1
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -11,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,12 +28,12 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.jvm.java
 import kotlin.random.Random
 
 class PaymentPage : ComponentActivity() {
@@ -82,62 +85,56 @@ fun PaymentScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val db = FirebaseFirestore.getInstance()
-    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+    val auth = FirebaseAuth.getInstance()
+    val scope = rememberCoroutineScope()
 
-    // ===========================================================
-    // LOAD LOGGED-IN USER ACCOUNT FROM FIRESTORE (IMPORTANT)
-    // ===========================================================
+    // Account state
     var accountId by remember { mutableStateOf<String?>(null) }
     var accountError by remember { mutableStateOf<String?>(null) }
+    var accountLoading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(true) {
-        val uid = auth.currentUser?.uid
+    // General error message for payment failures
+    var paymentError by remember { mutableStateOf<String?>(null) }
 
-        if (uid == null) {
-            accountError = "No logged in user"
-            return@LaunchedEffect
+    // Validate incoming required data (event and ticket details)
+    val initialInputError = remember(eventId, quantity, pricePerTicket) {
+        when {
+            eventId.isBlank() -> "Missing event information. Please go back and select the event again."
+            quantity <= 0 -> "Invalid quantity selected. Please go back and reselect your tickets."
+            pricePerTicket < 0.0 -> "Invalid ticket price. Please try again later."
+            else -> null
         }
+    }
 
-        db.collection("Account")
-            .whereEqualTo("uid", uid)
-            .get()
-            .addOnSuccessListener { snap ->
-                if (!snap.isEmpty) {
-                    val doc = snap.documents.first()
-                    accountId = doc.getString("accountId") // example: "A001"
-                } else {
-                    accountError = "Account not found"
+    // Load account from Firestore with proper error handling
+    LaunchedEffect(Unit) {
+        try {
+            val uid = auth.currentUser?.uid
+            if (uid == null) {
+                accountError = "You are not logged in. Please log in again."
+                return@LaunchedEffect
+            }
+
+            val snapshot = db.collection("Account")
+                .whereEqualTo("uid", uid)
+                .get()
+                .await()
+
+            if (!snapshot.isEmpty) {
+                val doc = snapshot.documents.first()
+                accountId = doc.getString("accountId")
+                if (accountId.isNullOrBlank()) {
+                    accountError = "Account data is incomplete. Please contact support."
                 }
+            } else {
+                accountError = "Your account could not be found. Please contact support."
             }
-            .addOnFailureListener {
-                accountError = "Failed to load account"
-            }
-    }
-
-    // UI waits until account is loaded
-    if (accountId == null && accountError == null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
+        } catch (e: Exception) {
+            accountError = "Failed to load account. ${e.message ?: "Unknown error."}"
+        } finally {
+            accountLoading = false
         }
-        return
     }
-
-    if (accountError != null) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Unable to load your account. Please try again.")
-        }
-        return
-    }
-
-    // ===========================================================
-    // NORMAL PAYMENT UI BELOW
-    // ===========================================================
 
     // Card fields
     var cardName by remember { mutableStateOf("") }
@@ -175,183 +172,302 @@ fun PaymentScreen(
             .format(Date(dateMillis))
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF2F4F7))
-    ) {
-
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-        ) {
-
-            Text(
-                "Payment",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            EventSummaryCard(
-                title = title,
-                artist = artist,
-                dateText = dateText,
-                venue = venue,
-                category = category,
-                section = section,
-                quantity = quantity
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            PriceCardWithPromo(
-                subtotal = subtotal,
-                bookingFee = bookingFee,
-                discountAmount = discountAmount,
-                finalTotal = finalTotal,
-                promoInput = promoInput,
-                onPromoInputChange = { promoInput = it.uppercase() },
-                appliedPromo = appliedPromo,
-                promoError = promoError,
-                onApplyPromo = {
-                    val result = evaluatePromoCode(promoInput.trim(), subtotal)
-                    if (result > 0) {
-                        appliedPromo = promoInput.trim().uppercase()
-                        discountAmount = result
-                        promoError = null
-                    } else {
-                        appliedPromo = null
-                        discountAmount = 0.0
-                        promoError = "Invalid promo code"
-                    }
-                }
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            CardDetailsSection(
-                cardName, { cardName = it },
-                cardNumber, { cardNumber = it },
-                expiryMonth, { expiryMonth = it },
-                expiryYear, { expiryYear = it },
-                cvv, { cvv = it }
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            BillingAddressSection(
-                billingName, { billingName = it },
-                addressLine1, { addressLine1 = it },
-                postalCode, { postalCode = it },
-                city, { city = it },
-                country, { country = it }
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // BUTTONS
-            if (isProcessing) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-
-            PrimaryGradientButton(
-                text = "Buy now • \$${String.format("%.2f", finalTotal)}",
-                enabled = !isProcessing
+    Scaffold(
+        topBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(95.dp)
             ) {
+                TicketLahHeader()
 
-                // Validate card
-                if (!validateCard(cardName, cardNumber, expiryMonth, expiryYear, cvv)) {
-                    Toast.makeText(context, "Check your card details", Toast.LENGTH_SHORT).show()
-                    return@PrimaryGradientButton
+                IconButton(
+                    onClick = { activity?.finish() },
+                    modifier = Modifier
+                        .padding(start = 10.dp, top = 20.dp)
+                        .size(60.dp)
+                        .align(Alignment.TopStart)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(24.dp)
+                    )
                 }
-
-                // Validate billing
-                if (billingName.isBlank() || addressLine1.isBlank() || postalCode.isBlank()) {
-                    Toast.makeText(context, "Billing address required", Toast.LENGTH_SHORT).show()
-                    return@PrimaryGradientButton
-                }
-
-                isProcessing = true
-
-                val bookingId = generateBookingId()
-
-                val bookingData = hashMapOf(
-                    "AccID" to db.document("Account/$accountId"),
-                    "Category" to category,
-                    "ConcertTitle" to title,
-                    "EventID" to eventId,
-                    "EventTime" to Timestamp(Date(dateMillis)),
-                    "Name" to cardName,
-                    "PaymentMethod" to "Card",
-                    "PurchaseTime" to Timestamp.now(),
-                    "Quantity" to quantity,
-                    "Section" to section,
-                    "TotalPrice" to finalTotal
-                )
-
-                db.collection("BookingDetails")
-                    .document(bookingId)
-                    .set(bookingData)
-                    .addOnSuccessListener {
-                        isProcessing = false
-                        showSuccessDialog = true
-                    }
-                    .addOnFailureListener { ex ->
-                        isProcessing = false
-                        Toast.makeText(context, ex.message, Toast.LENGTH_SHORT).show()
-                    }
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            SecondaryOutlineButton("Cancel", !isProcessing) {
-                activity?.finish()
-            }
-
-            Spacer(Modifier.height(12.dp))
         }
+    ) { padding ->
 
-        // SUCCESS POPUP
-        if (showSuccessDialog) {
-            AlertDialog(
-                onDismissRequest = {},
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showSuccessDialog = false
-
-                            val bookingIntent = android.content.Intent(
-                                context,
-                                BookingHistoryActivity::class.java
-                            )
-                            context.startActivity(bookingIntent)
-                            activity?.finish()
-                        }
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(Color(0xFFF2F4F7))
+        ) {
+            when {
+                // 1. Input error from navigation
+                initialInputError != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("View Booking")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            showSuccessDialog = false
+                        Text(
+                            text = initialInputError,
+                            color = Color.Red,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        SecondaryOutlineButton(
+                            text = "Go back",
+                            enabled = true
+                        ) {
                             activity?.finish()
                         }
-                    ) { Text("Close") }
-                },
-                title = { Text("Payment Successful") },
-                text = { Text("Your tickets are confirmed.") }
-            )
+                    }
+                }
+
+                // 2. Account loading
+                accountLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                // 3. Account error
+                accountError != null || accountId.isNullOrBlank() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = accountError ?: "Unable to load account.",
+                            color = Color.Red,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        SecondaryOutlineButton(
+                            text = "Close",
+                            enabled = true
+                        ) {
+                            activity?.finish()
+                        }
+                    }
+                }
+
+                // 4. Normal payment content
+                else -> {
+                    Column(
+                        modifier = Modifier
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "Payment",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        EventSummaryCard(
+                            title = title,
+                            artist = artist,
+                            dateText = dateText,
+                            venue = venue,
+                            category = category,
+                            section = section,
+                            quantity = quantity
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        PriceCardWithPromo(
+                            subtotal = subtotal,
+                            bookingFee = bookingFee,
+                            discountAmount = discountAmount,
+                            finalTotal = finalTotal,
+                            promoInput = promoInput,
+                            onPromoInputChange = { promoInput = it.uppercase() },
+                            appliedPromo = appliedPromo,
+                            promoError = promoError,
+                            onApplyPromo = {
+                                val result = evaluatePromoCode(promoInput.trim(), subtotal)
+                                if (result > 0) {
+                                    appliedPromo = promoInput.trim().uppercase()
+                                    discountAmount = result
+                                    promoError = null
+                                } else {
+                                    appliedPromo = null
+                                    discountAmount = 0.0
+                                    promoError = "Invalid promo code"
+                                }
+                            }
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        CardDetailsSection(
+                            cardName, { cardName = it },
+                            cardNumber, { cardNumber = it },
+                            expiryMonth, { expiryMonth = it },
+                            expiryYear, { expiryYear = it },
+                            cvv, { cvv = it }
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        BillingAddressSection(
+                            billingName, { billingName = it },
+                            addressLine1, { addressLine1 = it },
+                            postalCode, { postalCode = it },
+                            city, { city = it },
+                            country, { country = it }
+                        )
+
+                        Spacer(Modifier.height(24.dp))
+
+                        // Show payment error message if any
+                        if (paymentError != null) {
+                            Text(
+                                text = paymentError ?: "",
+                                color = Color(0xFFDC2626),
+                                fontSize = 13.sp
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        if (isProcessing) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                        }
+
+                        PrimaryGradientButton(
+                            text = "Buy now • \$${String.format("%.2f", finalTotal)}",
+                            enabled = !isProcessing
+                        ) {
+                            // Validate card
+                            if (!validateCard(cardName, cardNumber, expiryMonth, expiryYear, cvv)) {
+                                Toast.makeText(context, "Check your card details", Toast.LENGTH_SHORT).show()
+                                return@PrimaryGradientButton
+                            }
+
+                            // Validate billing
+                            if (billingName.isBlank() || addressLine1.isBlank() || postalCode.isBlank()) {
+                                Toast.makeText(context, "Billing address required", Toast.LENGTH_SHORT).show()
+                                return@PrimaryGradientButton
+                            }
+
+                            // Extra sanity check before writing to Firestore
+                            if (accountId.isNullOrBlank()) {
+                                paymentError = "Your account is not available. Please try again."
+                                return@PrimaryGradientButton
+                            }
+
+                            scope.launch {
+                                isProcessing = true
+                                paymentError = null
+                                try {
+                                    val bookingId = generateBookingId()
+
+                                    val eventTime = if (dateMillis == 0L) {
+                                        Timestamp.now()
+                                    } else {
+                                        Timestamp(Date(dateMillis))
+                                    }
+
+                                    val bookingData = hashMapOf(
+                                        "AccID" to db.document("Account/$accountId"),
+                                        "Category" to category,
+                                        "ConcertTitle" to title,
+                                        "EventID" to eventId,
+                                        "EventTime" to eventTime,
+                                        "Name" to cardName,
+                                        "PaymentMethod" to "Card",
+                                        "PurchaseTime" to Timestamp.now(),
+                                        "Quantity" to quantity,
+                                        "Section" to section,
+                                        "TotalPrice" to finalTotal
+                                    )
+
+                                    db.collection("BookingDetails")
+                                        .document(bookingId)
+                                        .set(bookingData)
+                                        .await()
+
+                                    isProcessing = false
+                                    showSuccessDialog = true
+                                } catch (ex: Exception) {
+                                    isProcessing = false
+                                    paymentError = ex.message ?: "Payment failed. Please try again."
+                                    Toast.makeText(
+                                        context,
+                                        "Payment failed. Please try again.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        SecondaryOutlineButton("Cancel", !isProcessing) {
+                            activity?.finish()
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    // Success dialog
+                    if (showSuccessDialog) {
+                        AlertDialog(
+                            onDismissRequest = {},
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showSuccessDialog = false
+                                        val bookingIntent = Intent(
+                                            context,
+                                            BookingHistoryActivity::class.java
+                                        )
+                                        context.startActivity(bookingIntent)
+                                        activity?.finish()
+                                    }
+                                ) {
+                                    Text("View Booking")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = {
+                                        showSuccessDialog = false
+                                        activity?.finish()
+                                    }
+                                ) {
+                                    Text("Close")
+                                }
+                            },
+                            title = { Text("Payment Successful") },
+                            text = { Text("Your tickets are confirmed.") }
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-
-
 /* ------------------------------------------------------------------
-   Reusable Components (NO CHANGES NEEDED)
+   Reusable Components
 ------------------------------------------------------------------ */
 
 @Composable
@@ -382,9 +498,18 @@ private fun EventSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column { Text("Category", color = Color.Gray, fontSize = 12.sp); Text(category) }
-                Column { Text("Section", color = Color.Gray, fontSize = 12.sp); Text(section) }
-                Column { Text("Qty", color = Color.Gray, fontSize = 12.sp); Text(quantity.toString()) }
+                Column {
+                    Text("Category", color = Color.Gray, fontSize = 12.sp)
+                    Text(category)
+                }
+                Column {
+                    Text("Section", color = Color.Gray, fontSize = 12.sp)
+                    Text(section)
+                }
+                Column {
+                    Text("Qty", color = Color.Gray, fontSize = 12.sp)
+                    Text(quantity.toString())
+                }
             }
         }
     }
@@ -439,15 +564,17 @@ private fun PriceCardWithPromo(
                     singleLine = true
                 )
                 Button(onClick = onApplyPromo, enabled = promoInput.isNotBlank()) {
-                    Text(if (appliedPromo != null) "Applied" else "Apply")
+                    Text(if (appliedPromo != null && promoError == null) "Applied" else "Apply")
                 }
             }
 
-            if (appliedPromo != null && promoError == null)
+            if (appliedPromo != null && promoError == null) {
                 Text("Applied: $appliedPromo", color = Color(0xFF16A34A))
+            }
 
-            if (promoError != null)
+            if (promoError != null) {
                 Text(promoError, color = Color(0xFFDC2626))
+            }
         }
     }
 }
@@ -477,6 +604,61 @@ private fun CardDetailsSection(
     cvv: String,
     onCvvChange: (String) -> Unit
 ) {
+
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var numberError by remember { mutableStateOf<String?>(null) }
+    var monthError by remember { mutableStateOf<String?>(null) }
+    var yearError by remember { mutableStateOf<String?>(null) }
+    var cvvError by remember { mutableStateOf<String?>(null) }
+
+    fun validate() {
+
+        // Name
+        nameError = if (cardName.isBlank()) "Name cannot be empty" else null
+
+        // Card number
+        numberError = when {
+            cardNumber.isBlank() -> "Card number cannot be empty"
+            cardNumber.length < 16 -> "Card number must be 16 digits"
+            else -> null
+        }
+
+        // Month
+        monthError = when {
+            expiryMonth.isBlank() -> "Required"
+            expiryMonth.toIntOrNull() == null -> "Numbers only"
+            expiryMonth.toInt() !in 1..12 -> "Enter a valid month"
+            else -> null
+        }
+
+        // Year (with live card-expired check)
+        yearError = when {
+            expiryYear.isBlank() -> "Required"
+            expiryYear.length != 2 -> "Must be 2 digits"
+            expiryYear.toIntOrNull() == null -> "Numbers only"
+
+            else -> {
+                val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) % 100
+                val inputYear = expiryYear.toInt()
+
+                if (inputYear < currentYear) "Card expired"
+                else null
+            }
+        }
+
+        // CVV
+        cvvError = when {
+            cvv.isBlank() -> "Required"
+            cvv.length != 3 -> "CVV must be 3 digits"
+            else -> null
+        }
+    }
+
+    // Trigger validation whenever user types
+    LaunchedEffect(cardName, cardNumber, expiryMonth, expiryYear, cvv) {
+        validate()
+    }
+
     Card(
         colors = CardDefaults.cardColors(Color.White),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -487,52 +669,89 @@ private fun CardDetailsSection(
 
             Text("Card details", fontWeight = FontWeight.SemiBold)
 
+            // NAME
             OutlinedTextField(
                 value = cardName,
                 onValueChange = onCardNameChange,
                 label = { Text("Name on card") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                isError = nameError != null
             )
+            if (nameError != null)
+                Text(nameError!!, color = Color.Red, fontSize = 12.sp)
 
+            // CARD NUMBER
             OutlinedTextField(
                 value = cardNumber,
                 onValueChange = {
-                    onCardNumberChange(it.filter { ch -> ch.isDigit() }.take(16))
+                    val clean = it.filter { ch -> ch.isDigit() }.take(16)
+                    onCardNumberChange(clean)
                 },
                 label = { Text("Card number") },
                 singleLine = true,
+                isError = numberError != null,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
+            if (numberError != null)
+                Text(numberError!!, color = Color.Red, fontSize = 12.sp)
 
+            // MONTH + YEAR + CVV FIELDS
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = expiryMonth,
-                    onValueChange = { if (it.length <= 2) onExpiryMonthChange(it.filter { d -> d.isDigit() }) },
-                    label = { Text("MM") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
 
-                OutlinedTextField(
-                    value = expiryYear,
-                    onValueChange = { if (it.length <= 2) onExpiryYearChange(it.filter { d -> d.isDigit() }) },
-                    label = { Text("YY") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                // MONTH
+                Column(Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = expiryMonth,
+                        onValueChange = {
+                            val clean = it.filter { d -> d.isDigit() }.take(2)
+                            onExpiryMonthChange(clean)
+                        },
+                        label = { Text("MM") },
+                        isError = monthError != null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    if (monthError != null)
+                        Text(monthError!!, color = Color.Red, fontSize = 12.sp)
+                }
 
-                OutlinedTextField(
-                    value = cvv,
-                    onValueChange = { if (it.length <= 3) onCvvChange(it.filter { d -> d.isDigit() }) },
-                    label = { Text("CVV") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                // YEAR
+                Column(Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = expiryYear,
+                        onValueChange = {
+                            val clean = it.filter { d -> d.isDigit() }.take(2)
+                            onExpiryYearChange(clean)
+                        },
+                        label = { Text("YY") },
+                        isError = yearError != null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    if (yearError != null)
+                        Text(yearError!!, color = Color.Red, fontSize = 12.sp)
+                }
+
+                // CVV
+                Column(Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = cvv,
+                        onValueChange = {
+                            val clean = it.filter { d -> d.isDigit() }.take(3)
+                            onCvvChange(clean)
+                        },
+                        label = { Text("CVV") },
+                        isError = cvvError != null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    if (cvvError != null)
+                        Text(cvvError!!, color = Color.Red, fontSize = 12.sp)
+                }
             }
         }
     }
 }
+
+
 
 @Composable
 private fun BillingAddressSection(
@@ -575,7 +794,9 @@ private fun BillingAddressSection(
 
                 OutlinedTextField(
                     value = postalCode,
-                    onValueChange = { if (it.length <= 6) onPostalCodeChange(it.filter { c -> c.isDigit() }) },
+                    onValueChange = {
+                        if (it.length <= 6) onPostalCodeChange(it.filter { c -> c.isDigit() })
+                    },
                     label = { Text("Postal code") },
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -611,27 +832,16 @@ private fun PrimaryGradientButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues()
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFFFD300), // YELLOW
+            contentColor = Color.Black
+        ),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color(0xFF2563EB),
-                            Color(0xFF4F46E5)
-                        )
-                    ),
-                    RoundedCornerShape(12.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text, color = Color.White, fontWeight = FontWeight.SemiBold)
-        }
+        Text(text, fontWeight = FontWeight.SemiBold)
     }
 }
+
 
 @Composable
 private fun SecondaryOutlineButton(
@@ -663,14 +873,27 @@ private fun validateCard(
     year: String,
     cvv: String
 ): Boolean {
+
     if (name.isBlank()) return false
     if (number.length != 16) return false
+
     val m = month.toIntOrNull() ?: return false
     if (m !in 1..12) return false
+
     if (year.length != 2) return false
+    val y = year.toIntOrNull() ?: return false
+
+    val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) % 100
+
+    // Reject if year already passed
+    if (y < currentYear) return false
+
     if (cvv.length != 3) return false
+
     return true
 }
+
+
 
 private fun generateBookingId(): String {
     val prefix = "BK"

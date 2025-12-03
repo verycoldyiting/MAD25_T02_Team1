@@ -31,6 +31,7 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
+import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -322,7 +323,8 @@ fun EventDetailsContent(
                 .padding(horizontal = 16.dp)
                 .height(48.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF2196F3)
+                containerColor = YELLOW,
+                contentColor = Color.Black
             )
         ) {
             Text("Buy Tickets", fontSize = 16.sp, fontWeight = FontWeight.Bold)

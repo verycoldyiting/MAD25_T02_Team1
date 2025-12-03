@@ -8,7 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
-sealed class BottomNavItem(
+sealed class BottomNavItem( //define bottom nav items
     val title: String,
     val route: String,
     val icon: ImageVector? = null,
@@ -26,9 +26,9 @@ fun BottomNavigationBar(
     selectedItem: BottomNavItem,
     onItemSelected: (BottomNavItem) -> Unit
 ) {
-    NavigationBar(containerColor = Color(0xFF00A2FF)) {
+    NavigationBar(containerColor = Color(0xFF00A2FF)) { //blue color
 
-        val items = listOf(
+        val items = listOf(  //list of icons
             BottomNavItem.Home,
             BottomNavItem.Search,
             BottomNavItem.Tickets,
@@ -41,7 +41,7 @@ fun BottomNavigationBar(
                 onClick = { onItemSelected(item) },
 
                 icon = {
-                    when {
+                    when { //flexible bottom bar
                         item.iconPainter != null ->
                             Icon(
                                 painter = painterResource(item.iconPainter),

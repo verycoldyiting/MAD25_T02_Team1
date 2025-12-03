@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.material3.AlertDialog
@@ -46,7 +44,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.core.content.ContextCompat.startActivity
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
@@ -76,6 +73,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier
 ){
+    //store user input
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
 
@@ -87,6 +85,7 @@ fun LoginScreen(
     ) {
         TicketLahHeader()
 
+        //move form lower
         Spacer(modifier = Modifier.height(200.dp))
 
         Column(
@@ -123,6 +122,7 @@ fun LoginScreen(
             var passwordVisible by remember { mutableStateOf(false) }
 
             OutlinedTextField(
+                //password input w visibility toggle
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
@@ -149,12 +149,13 @@ fun LoginScreen(
 
             Button(
                 onClick = {
-
+                    //check for empty fields
                     if (email.isBlank() || password.isBlank()) {
                         loginError = "Please enter both email and password"
                         return@Button
                     }
 
+                    //login succeed redirect to home page
                     auth.signInWithEmailAndPassword(email, password)
                         .addOnSuccessListener {
                             val intent = Intent(context, HomePage::class.java)

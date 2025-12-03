@@ -61,6 +61,7 @@ fun EventDetailsScreen(
 
     var imageUrl by remember { mutableStateOf<String?>(null) }
     var loadingImage by remember { mutableStateOf(true) }
+    var imageError by remember { mutableStateOf<String?>(null) }
 
     // Fetch Event
     LaunchedEffect(eventId) {
@@ -72,30 +73,39 @@ fun EventDetailsScreen(
                 .await()
 
             event = doc.toObject(Event::class.java)
+            Log.d("EventDetails", "Event loaded: ${event?.name}, Image: ${event?.eventImage}")
         } catch (e: Exception) {
-            Log.e("EventDetails", "Error: ${e.message}")
+            Log.e("EventDetails", "Error loading event: ${e.message}", e)
         }
         isLoading = false
     }
 
     // Load event image
     LaunchedEffect(event?.eventImage) {
-        val raw = event?.eventImage ?: ""
-        if (raw.isEmpty()) {
+        loadingImage = true
+        val rawUrl = event?.eventImage?.trim() ?: ""
+
+        if (rawUrl.isEmpty()) {
             loadingImage = false
+            imageError = null
             return@LaunchedEffect
         }
 
-        loadingImage = true
-
-        imageUrl = try {
-            if (raw.startsWith("gs://")) {
-                FirebaseStorage.getInstance().getReferenceFromUrl(raw)
-                    .downloadUrl.await().toString()
-            } else raw
-        } catch (e: Exception) {
-            Log.e("ImageLoad", "Error loading image: ${e.message}")
-            null
+        imageUrl = if (rawUrl.startsWith("gs://")) {
+            try {
+                Log.d("ImageLoad", "Loading gs:// URL: $rawUrl")
+                val ref = FirebaseStorage.getInstance().getReferenceFromUrl(rawUrl)
+                ref.downloadUrl.await().toString().also {
+                    Log.d("ImageLoad", "Successfully loaded image URL: $it")
+                }
+            } catch (e: Exception) {
+                Log.e("ImageLoad", "Failed to get download URL for ${event?.name}", e)
+                imageError = e.message
+                null
+            }
+        } else {
+            Log.d("ImageLoad", "Direct URL: $rawUrl")
+            rawUrl
         }
 
         loadingImage = false
@@ -109,7 +119,7 @@ fun EventDetailsScreen(
             ) {
                 TicketLahHeader()
 
-                // Beautiful Back Button
+                // Back Button
                 IconButton(
                     onClick = onBackPressed,
                     modifier = Modifier
@@ -117,16 +127,14 @@ fun EventDetailsScreen(
                         .size(60.dp)
                         .align(Alignment.TopStart)
                 ) {
-
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .size(24.dp)
-                        )
-
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(24.dp)
+                    )
                 }
             }
         }
@@ -148,7 +156,8 @@ fun EventDetailsScreen(
                 event != null -> EventDetailsContent(
                     event = event!!,
                     imageUrl = imageUrl,
-                    loadingImage = loadingImage
+                    loadingImage = loadingImage,
+                    imageError = imageError
                 )
 
                 else -> Box(
@@ -164,7 +173,8 @@ fun EventDetailsScreen(
 fun EventDetailsContent(
     event: Event,
     imageUrl: String?,
-    loadingImage: Boolean
+    loadingImage: Boolean,
+    imageError: String?
 ) {
     val context = LocalContext.current
 
@@ -176,21 +186,60 @@ fun EventDetailsContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp),
+                .height(300.dp)
+                .background(Color(0xFFEEEEEE)),
             contentAlignment = Alignment.Center
         ) {
             when {
                 loadingImage -> CircularProgressIndicator()
+
+                imageError != null -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        "Failed to load image",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        imageError,
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
                 imageUrl != null -> AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
                         .crossfade(true)
+                        .listener(
+                            onError = { _, result ->
+                                Log.e("AsyncImage", "Error loading image: ${result.throwable.message}")
+                            },
+                            onSuccess = { _, _ ->
+                                Log.d("AsyncImage", "Image loaded successfully")
+                            }
+                        )
                         .build(),
                     contentDescription = event.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-                else -> Text("No Image Available", color = Color.Gray)
+
+                else -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("No Image Available", color = Color.Gray)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Image path: ${event.eventImage ?: "null"}",
+                        fontSize = 10.sp,
+                        color = Color.LightGray
+                    )
+                }
             }
         }
 
@@ -229,8 +278,8 @@ fun EventDetailsContent(
                     Spacer(Modifier.width(12.dp))
 
                     Column {
-                        Text("Date", color = Color.Gray)
-                        Text(formatDate(event.date))
+                        Text("Date", color = Color.Gray, fontSize = 12.sp)
+                        Text(formatDate(event.date), fontWeight = FontWeight.Medium)
                     }
                 }
 
@@ -250,8 +299,8 @@ fun EventDetailsContent(
                     Spacer(Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Venue", color = Color.Gray)
-                        Text(event.venue ?: "Venue TBA")
+                        Text("Venue", color = Color.Gray, fontSize = 12.sp)
+                        Text(event.venue ?: "Venue TBA", fontWeight = FontWeight.Medium)
                     }
 
                     OutlinedButton(onClick = {}) {
@@ -271,8 +320,12 @@ fun EventDetailsContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .height(48.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF2196F3)
+            )
         ) {
-            Text("Buy Tickets")
+            Text("Buy Tickets", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(16.dp))
@@ -287,7 +340,11 @@ fun EventDetailsContent(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
 
-                    Text("Event Information", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Event Information",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
 
                     event.artist?.let {
                         Spacer(Modifier.height(12.dp))
@@ -317,8 +374,8 @@ fun InfoRow(label: String, value: String) {
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = Color.Gray)
-        Text(value)
+        Text(label, color = Color.Gray, fontSize = 14.sp)
+        Text(value, fontWeight = FontWeight.Medium, fontSize = 14.sp)
     }
 }
 

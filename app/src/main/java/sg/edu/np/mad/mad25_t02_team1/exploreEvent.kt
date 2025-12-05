@@ -1,10 +1,7 @@
 package sg.edu.np.mad.mad25_t02_team1
 
 import android.content.Intent
-import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -35,75 +32,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
-import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
 
-class ExploreEventActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // Entry point: Setting the Compose content with the App Theme
-        setContent {
-            MAD25_T02_Team1Theme {
-                ExploreEventsScaffold()
-            }
-        }
-    }
-}
 
-/**
- * Main Scaffold Layout
- * Handles the TopBar, BottomBar, and Navigation Graph logic.
- */
-@Composable
-fun ExploreEventsScaffold() {
-    val navController = rememberNavController()
-    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Search) }
-
-    Scaffold(
-        topBar = { TicketLahHeader() },  // Custom header component
-        bottomBar = {
-            BottomNavigationBar(
-                selectedItem = selectedTab,
-                onItemSelected = { item ->
-                    selectedTab = item
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
-        },
-        containerColor = Color.White
-    ) { innerPadding ->
-        // Defines the available routes (screens) within this activity
-        NavHost(
-            navController = navController,
-            startDestination = BottomNavItem.Search.route, // Default landing screen
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(BottomNavItem.Home.route) {
-                HomePageContent()
-            }
-
-            composable(BottomNavItem.Search.route) {
-                ExploreEventsApp() // The main Explore functionality
-            }
-
-            composable(BottomNavItem.Tickets.route) {
-                BookingHistoryScreen()
-            }
-
-            composable(BottomNavItem.Profile.route) {
-                Text("Profile Screen Placeholder")
-            }
-        }
-    }
-}
 /**
  * ExploreEventsApp
  * Contains the logic for fetching events, searching by artist, and filtering by genre.

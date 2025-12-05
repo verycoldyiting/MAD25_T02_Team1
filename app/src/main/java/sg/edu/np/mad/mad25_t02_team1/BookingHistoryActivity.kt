@@ -12,7 +12,6 @@ class BookingHistoryActivity : ComponentActivity() {
         setContent {
             MAD25_T02_Team1Theme {
                 BookingHistoryScaffold()
-
             }
         }
     }

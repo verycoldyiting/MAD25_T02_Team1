@@ -1,31 +1,22 @@
 package sg.edu.np.mad.mad25_t02_team1
 
 import android.app.Activity
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
 class EditProfileActivity : ComponentActivity() {
@@ -49,15 +40,7 @@ fun EditProfileScreen() {
     val email = user.email ?: "" // cannot change
 
 
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var existingImageUrl by remember { mutableStateOf<String?>(null) }
-
     val context = LocalContext.current
-
-    //image picker setup
-    val pickImage = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri -> selectedImageUri = uri }
 
     // load profile
     LaunchedEffect(Unit) {
@@ -72,11 +55,6 @@ fun EditProfileScreen() {
                     phone = doc.getString("phone") ?: ""
                 }
             }
-        //load from firestore
-        FirebaseStorage.getInstance()
-            .reference.child("profile/${user.uid}.jpg")
-            .downloadUrl
-            .addOnSuccessListener { existingImageUrl = it.toString() }
     }
 
     Scaffold(
@@ -90,16 +68,6 @@ fun EditProfileScreen() {
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            AsyncImage(
-                model = selectedImageUri ?: existingImageUrl ?: "https://via.placeholder.com/150",
-                contentDescription = null,
-                modifier = Modifier
-                    .size(130.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray)
-                    .clickable { pickImage.launch("image/*") }
-            )
 
             Spacer(Modifier.height(20.dp))
 
@@ -154,12 +122,6 @@ fun EditProfileScreen() {
                                     )
                             }
                         }
-
-                    selectedImageUri?.let { uri ->
-                        FirebaseStorage.getInstance()
-                            .reference.child("profile/${user.uid}.jpg")
-                            .putFile(uri)
-                    }
 
                     //pop-up message
                     Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()

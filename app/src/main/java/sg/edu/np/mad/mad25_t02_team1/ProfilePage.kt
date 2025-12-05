@@ -20,15 +20,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
-class ProfileActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { ProfileScreen() }
-    }
-}
 
 @Composable
 fun ProfileScreen() {
@@ -42,7 +35,6 @@ fun ProfileScreen() {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     val email = user.email ?: ""
-    var imageUrl by remember { mutableStateOf("") }
 
     val context = LocalContext.current
 
@@ -60,11 +52,6 @@ fun ProfileScreen() {
                     phone = doc.getString("phone") ?: ""
                 }
             }
-        //load profile image from firebase
-        FirebaseStorage.getInstance()
-            .reference.child("profile/${user.uid}.jpg")
-            .downloadUrl
-            .addOnSuccessListener { imageUrl = it.toString() }
     }
 
     Column(
@@ -75,7 +62,7 @@ fun ProfileScreen() {
     ) {
 
         AsyncImage(
-            model = imageUrl.ifEmpty { "https://via.placeholder.com/150" },
+            model = null,
             contentDescription = "",
             modifier = Modifier
                 .size(130.dp)

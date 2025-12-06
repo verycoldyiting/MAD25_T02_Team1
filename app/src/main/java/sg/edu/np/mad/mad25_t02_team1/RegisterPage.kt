@@ -123,7 +123,7 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Confirm Password") },
+                label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
                     //visibility of the password
@@ -144,7 +144,7 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = { Text("Password") },
+                label = { Text("Confirm Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
                     val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff

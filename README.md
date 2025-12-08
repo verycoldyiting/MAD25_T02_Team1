@@ -12,7 +12,9 @@ To allow people in Singapore to be able to purchase event tickets easily.
 Entertainment
 
 # Declaration of LLM used to assist in development 
-
+ChatGPT,
+Gemini,
+Google AI Studio
 
 
 
@@ -32,7 +34,12 @@ Entertainment
 * Provides a page that allows users to choose to login or register.
 * Offers a seamless transition between login and registration forms.
 
-2. Firebase Integration:
+2. Password Visibility Toggle:
+
+* Users can check the checkbox to show their password.
+* Allows users to verify their input for accuracy, enhancing security and reducing login errors.
+
+3. Firebase Integration:
 * Account information is checked through Firebase.
 * Newly created accounts are updated in Firebase for secure management using Firebase Authentication.
 * Ensures user data is managed safely and efficiently, leveraging Firebase's robust authentication mechanisms.
@@ -45,17 +52,14 @@ Entertainment
 * Data is dynamically populated from Firebase, ensuring it is always up-to-date.
 2. Edit Profile:
 
-* Users can edit their profile information by pressing the pencil icon next to the fields.
+* Users can edit their profile information by pressing the edit profile button.
 * Provides an intuitive and user-friendly way to make changes to personal details.
-3. Password Visibility Toggle:
 
-* Users can check the checkbox to show their password.
-* Allows users to verify their input for accuracy, enhancing security and reducing login erros.
 4. Logout Button:
 
 * Allows users to log out of their account.
 * Provides a secure way to end the session.
-5. Save Button:
+5. Save Changes Button:
 
 * Allows users to save updated account information.
 * Ensures changes are stored and reflected in their profile and stored in Firebase.
@@ -69,20 +73,17 @@ Entertainment
 * Displays a horizontal scrolling list of upcoming events.
 * The top 3 events are displayed based on their upcoming dates.
 * Event information is dynamically extracted from Firebase and populated on the interface.
-3. "Recommended for You" Section:
+3. "Upcoming Events" Section:
 
 * Shows a recycler view of events recommended for the user.
 * Recommendations allows user to view the available list of events that are happening in singapore.
-4. Dynamic Event Picture:
 
-* The featured event picture displayed below the header changes randomly.
-* Each time the user refreshes the page, a new image is shown.
-5. User-Friendly Footer:
+4. User-Friendly Footer:
 
 * Contains navigation icons for easier movement through the app.
 * Designed to be intuitive and enhance the user experience.
 
-## Footer Navigation [Valerie Kho]
+## Footer Navigation and Header Implementation [Valerie Kho/Daphne Cheng]
 * The footer navigation includes icons that links to the Homepage, Explore Events, Booking History, and Profile Page for easy access and seamless user experience.
 
 ## Explore Event Page [Natalie Wong]
@@ -90,13 +91,16 @@ Entertainment
 
 * Allows users to search events by title or artist.
 * Provides a user-friendly interface for quick event discovery.
+  
 2. Filter Options:
-* Users can filter events by price, event type, or date.
+  
+* Users can filter events by genre.
 * Price and event type options are dynamic and depend on the database.
 * Users can clear the selected filters by using the "Clear Filters" button.
 * Ensures users can find events that meet their preferences.
 * Made scrollable to ensure responsiveness in landscape orientation.
-3. RecyclerView of Events:
+  
+3. View of Events:
 
 * Displays a list of different events at the bottom of the page.
 * Events are dynamically populated from Firebase.
@@ -113,29 +117,34 @@ Entertainment
         * **Description:** Detailed information about the event.
         * **Ticket Price:** Cost of attending the event.
         * **General Sales:** Date and time when tickets go on sale.
+          
 2. View Seat Map:
 
 * A dialogue allows users to see the concert location map.
 * Includes detailed seating arrangements and ticket pricing.
+  
 3. Buy Tickets Button:
 
 * Directs users to the ticket purchasing page.
 * Ensures a seamless process for ticket acquisition.
 
 ## Buy Tickets Page [Yu Hong]
-1. Image View of Map Including Seat Number:
+1. Image View of Map:
 
 * Displays a visual map of the venue with seating arrangements.
-* Allows users to see the layout and select their preferred seats.
+* Allows users to see the layout and select their preferred sections.
+  
 2. Dropdown for Different Categories and Seat Numbers:
 
 * Populated from data stored in Firebase.
 * Users can select a seat category first, which filters available seat numbers.
+  
 3. Seat Selection Logic:
 
 * Users can only choose a seat number after selecting a seat category.
-* Once both seat category and number are chosen, the bottom information will autofill.
-4 Edit View for Ticket Quantity:
+* Once both seat category and number are chosen, the bottom information will show total price.
+  
+4. Ticket Quantity:
 
 * Allows users to enter the number of tickets they wish to purchase.
 5. Toast Messages:
@@ -143,9 +152,10 @@ Entertainment
 * Alerts users of their choices.
 * Ensures users enter a quantity greater than 0.
 * If the user changes the seat category, the previously selected seat number will disappear, and the book button will be hidden to enforce the selection of a new seat number.
+  
 6. Book Button:
 
-* Appears only when all information in the table is filled.
+* Lights up only when all information in the table is filled.
 * Ensures all necessary selections are made before proceeding.
 
 ## Payment Details Page [Valerie Kho]
@@ -153,18 +163,23 @@ Entertainment
 
 * Allows users to enter necessary card details and billing address.
 * Dropdown to allow users to choose their preferred card type.
+  
 2. View Booking Button:
 
 * Opens a dialogue that shows booking information made by the user from the previous page.
+  
 3. Total Price TextView:
 
 * Displays the total price the user has to pay.
+  
 4. Buy Now Button:
 
 * Allows the user to complete the purchase.
+  
 5. Toast Messages:
 
 * Alerts users if they enter any field incorrectly.
+  
 6. Cancel Button:
 
 * Leads users back to the buy tickets page.
@@ -174,6 +189,7 @@ Entertainment
 
 * Shows the booking history of the user, populated from Firebase.
 * Provides a comprehensive view of all bookings made by the user.
+  
 2. Booking Information Cards:
 
 * Each card displays detailed information about a booking, including:
@@ -183,6 +199,7 @@ Entertainment
     * **Quantity**
     * **Payment Method**
 * Ensures users have easy access to their booking details.
+  
 3. RecyclerView of Booking details
 
 * Displays a list of booking details that user had booked

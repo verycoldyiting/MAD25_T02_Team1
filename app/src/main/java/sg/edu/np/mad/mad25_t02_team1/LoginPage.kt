@@ -2,6 +2,7 @@ package sg.edu.np.mad.mad25_t02_team1
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -44,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import com.google.firebase.firestore.FirebaseFirestore
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
@@ -155,11 +157,40 @@ fun LoginScreen(
                         return@Button
                     }
 
-                    //login succeed redirect to home page
                     auth.signInWithEmailAndPassword(email, password)
                         .addOnSuccessListener {
-                            val intent = Intent(context, HomePage::class.java)
-                            context.startActivity(intent)
+                            //to check if uid is null; return a valid logged in user
+                            val uid = it.user?.uid
+
+                            if (uid == null) {
+                                loginError = "User not found. Please register for an account!"
+                                return@addOnSuccessListener
+                            }
+
+                            val db = FirebaseFirestore.getInstance()
+
+                            // Check if the user exists in the Account collection
+                            db.collection("Account")
+                                .whereEqualTo("uid", uid)
+                                .get()
+                                .addOnSuccessListener { snap ->
+
+                                    if (snap.isEmpty) {
+                                        // User authenticated but no Firestore account entry
+                                        loginError = "User not found. Please register for a new account."
+                                        return@addOnSuccessListener
+                                    }
+
+                                    // Account exists = login successful
+                                    Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
+
+                                    val intent = Intent(context, HomePage::class.java)
+                                    context.startActivity(intent)
+                                }
+                                .addOnFailureListener { err ->
+                                    loginError = err.message
+                                }
+
                         }
                         .addOnFailureListener {
                             loginError = it.message
@@ -176,6 +207,7 @@ fun LoginScreen(
             ) {
                 Text("Login")
             }
+
 
 
             Spacer(modifier = Modifier.height(14.dp))

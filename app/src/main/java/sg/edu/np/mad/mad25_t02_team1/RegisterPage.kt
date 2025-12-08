@@ -1,35 +1,54 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import android.content.Intent
-import android.widget.Toast
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
@@ -50,20 +69,16 @@ class RegisterPage : ComponentActivity() {
 @Composable
 fun RegisterScreen(modifier: Modifier = Modifier) {
 
-    //store user input
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
 
-    //visibility of the pop up message
     var showSuccessDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
-
-    //for authentication
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
@@ -110,10 +125,11 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
 
             OutlinedTextField(
                 value = phone,
-                onValueChange = { phone = it },
+                onValueChange = { if (it.length <= 8) phone = it },
                 label = { Text("Phone Number") },
                 leadingIcon = { Icon(Icons.Default.Phone, null) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -124,19 +140,17 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
-                    //visibility of the password
-                    val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    val icon =
+                        if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(icon, contentDescription = if (passwordVisible) "Hide password" else "Show password")
+                        Icon(icon, contentDescription = null)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (passwordVisible)
-                    VisualTransformation.None
-                else
-                    PasswordVisualTransformation()
+                visualTransformation =
+                    if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -145,18 +159,17 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
-                    val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    val icon =
+                        if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(icon, contentDescription = if (passwordVisible) "Hide password" else "Show password")
+                        Icon(icon, contentDescription = null)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (passwordVisible)
-                    VisualTransformation.None
-                else
-                    PasswordVisualTransformation()
+                visualTransformation =
+                    if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -164,61 +177,64 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
             Button(
                 onClick = {
 
-                    //check for empty fields
                     if (name.isBlank() || email.isBlank() || phone.isBlank() ||
                         password.isBlank() || confirmPassword.isBlank()) {
                         errorMessage = "Please fill in all fields"
                         return@Button
                     }
 
-                    //check if phone num is valid
-                    if (!isValidPhone(phone)) {
-                        Toast.makeText(context, "Phone Number must start with 8 or 9 and be 8 digits.", Toast.LENGTH_SHORT).show()
+                    if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                        errorMessage = "Please enter a valid email address"
                         return@Button
                     }
 
-                    //check if passwords match anot
+                    if (!isValidPhone(phone)) {
+                        errorMessage = "Phone number must start with 8 or 9!"
+                        return@Button
+                    }
+
+                    if (!isValidPassword(password)) {
+                        errorMessage =
+                            "Password must contain:\n• 1 uppercase\n• 1 number\n• 1 special character\n• Minimum 8 characters"
+                        return@Button
+                    }
+
                     if (password != confirmPassword) {
                         errorMessage = "Passwords do not match"
                         return@Button
                     }
 
-                    //create firebase auth user
                     auth.createUserWithEmailAndPassword(email, password)
                         .addOnSuccessListener { result ->
 
                             val uid = result.user?.uid ?: return@addOnSuccessListener
 
-                            //generate next accountID
                             db.collection("Account")
                                 .orderBy("accountId", com.google.firebase.firestore.Query.Direction.DESCENDING)
                                 .limit(1)
                                 .get()
-                                .addOnSuccessListener { snapshot ->
+                                .addOnSuccessListener { snap ->
 
-                                    val lastId = if (!snapshot.isEmpty) {
-                                        snapshot.documents[0].getString("accountId") ?: "A000"
-                                    } else {
-                                        "A000" // First user case
-                                    }
+                                    val lastId = if (!snap.isEmpty)
+                                        snap.documents[0].getString("accountId") ?: "A000"
+                                    else "A000"
 
-                                    val nextNumber = lastId.substring(1).toInt() + 1
-                                    val newAccountId = "A" + nextNumber.toString().padStart(3, '0')
+                                    val nextNum = lastId.substring(1).toInt() + 1
+                                    val newId = "A" + nextNum.toString().padStart(3, '0')
 
                                     val userData = hashMapOf(
-                                        "accountId" to newAccountId,
+                                        "accountId" to newId,
                                         "uid" to uid,
                                         "name" to name,
                                         "email" to email,
                                         "phone" to phone
                                     )
 
-                                    //save the user in firestore
                                     db.collection("Account")
-                                        .document(newAccountId)
+                                        .document(newId)
                                         .set(userData)
                                         .addOnSuccessListener {
-                                            showSuccessDialog = true //show success message
+                                            showSuccessDialog = true
                                         }
                                         .addOnFailureListener {
                                             errorMessage = it.message
@@ -227,11 +243,10 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                                 .addOnFailureListener {
                                     errorMessage = it.message
                                 }
-                        }
-                        .addOnFailureListener {
+
+                        }.addOnFailureListener {
                             errorMessage = it.message
                         }
-
 
                 },
                 colors = ButtonDefaults.buttonColors(
@@ -245,7 +260,6 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 Text("Register Now")
             }
 
-            //error dialogue
             errorMessage?.let { msg ->
                 AlertDialog(
                     onDismissRequest = { errorMessage = null },
@@ -259,10 +273,9 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
                 )
             }
 
-            //success dialogue
             if (showSuccessDialog) {
                 AlertDialog(
-                    onDismissRequest = { },
+                    onDismissRequest = {},
                     confirmButton = {
                         TextButton(onClick = {
                             showSuccessDialog = false
@@ -280,6 +293,13 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
     }
 }
 
+// PHONE VALIDATION
 fun isValidPhone(phone: String): Boolean {
-    return phone.matches(Regex("^[89][0-9]{7}$")) //regex pattern for 8/9 followed by 7 digits
+    return phone.matches(Regex("^[89][0-9]{7}$"))
+}
+
+// PASSWORD VALIDATION
+fun isValidPassword(password: String): Boolean {
+    val regex = Regex("^(?=.*[A-Z])(?=.*\\d)(?=.*[@#\$%^&+=!])(?!.*\\s).{8,}$")
+    return regex.matches(password)
 }

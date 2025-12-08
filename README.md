@@ -12,8 +12,8 @@ To allow people in Singapore to be able to purchase event tickets easily.
 Entertainment
 
 # Declaration of LLM used to assist in development 
-ChatGPT
-Gemini
+ChatGPT,
+Gemini,
 Google AI Studio
 
 

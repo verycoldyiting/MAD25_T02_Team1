@@ -14,7 +14,7 @@ import coil.compose.AsyncImage
 fun TicketLahHeader() {
 
     val logoUrl =
-        "https://firebasestorage.googleapis.com/v0/b/mad25t02team1.firebasestorage.app/o/6129816439578364825-removebg-preview.png?alt=media&token=64926ab9-1600-4e26-bd90-791f57552ff3"
+        "https://firebasestorage.googleapis.com/v0/b/mad25t02team1.firebasestorage.app/o/6129816439578364825-removebg-preview.png?alt=media&token=4c6d8395-e830-4b26-8c1e-1273998283c0"
 
     Box(
         modifier = Modifier

@@ -20,18 +20,17 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 
 
 @Composable
 fun ProfileScreen() {
 
-    //firebase setup
+    // firebase setup
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser ?: return // Handle case where user is null
     val db = FirebaseFirestore.getInstance()
 
-    //will recompose the screen whenever these values change
+    // will recompose the screen whenever these values change
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var profileImageUrl by remember { mutableStateOf<String?>(null) }
@@ -39,7 +38,7 @@ fun ProfileScreen() {
 
     val context = LocalContext.current
 
-    //auto refresh with real-time updates
+    // auto refresh with real-time updates
     LaunchedEffect(user.uid) {
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
@@ -80,7 +79,7 @@ fun ProfileScreen() {
                     contentScale = ContentScale.Crop
                 )
             } else {
-                // Default icon when no profile picture
+                // Default grey icon used when no profile picture
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "Default Profile",
@@ -100,11 +99,11 @@ fun ProfileScreen() {
 
         Button(
             onClick = {
-                //brings u to edit profile page
+                // Brings u to edit profile page
                 context.startActivity(Intent(context, EditProfileActivity::class.java))
             },
             colors = ButtonDefaults.buttonColors(
-                containerColor = YELLOW,
+                containerColor = Color.Yellow,
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),
@@ -118,13 +117,13 @@ fun ProfileScreen() {
 
         Button(
             onClick = {
-                auth.signOut() //sign user out of firebase auth
+                auth.signOut() // Sign user out of firebase auth
                 val intent = Intent(context, LoginScreen::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 context.startActivity(intent)
             },
             colors = ButtonDefaults.buttonColors(
-                containerColor = YELLOW,
+                containerColor = Color.Yellow,
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),

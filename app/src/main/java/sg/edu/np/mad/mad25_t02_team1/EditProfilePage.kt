@@ -44,7 +44,6 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
-import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 import java.util.*
 
 class EditProfileActivity : ComponentActivity() {
@@ -79,21 +78,21 @@ fun EditProfileScreen() {
 
     val context = LocalContext.current
 
-    // Modern Photo Picker for Android 13+
+    // Photo Picker for Android 13+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         uri?.let { selectedImageUri = it }
     }
 
-    // Fallback for older Android versions
+    // In the event there's a use of older Android versions, this is used as the fallback
     val legacyImagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { selectedImageUri = it }
     }
 
-    // Permission launcher for READ_MEDIA_IMAGES (Android 13+)
+    // Permission launcher to read media images for Android 13+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -204,7 +203,7 @@ fun EditProfileScreen() {
                     onClick = { selectPhoto() },
                     modifier = Modifier
                         .size(36.dp)
-                        .background(YELLOW, CircleShape)
+                        .background(Color.Yellow, CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
@@ -384,7 +383,7 @@ fun EditProfileScreen() {
                 },
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = YELLOW,
+                    containerColor = Color.Yellow,
                     contentColor = Color.Black
                 ),
                 border = BorderStroke(1.dp, Color.Black),
@@ -426,7 +425,7 @@ private fun updateProfile(
         return
     }
 
-    // 1. Define updateFirestore first (used by uploadImageAndUpdate)
+    //  Define updateFirestore first (used by uploadImageAndUpdate)
     fun updateFirestore(imageUrl: String?) {
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
@@ -460,7 +459,7 @@ private fun updateProfile(
             }
     }
 
-    // 2. Define uploadImageAndUpdate next (used by updateEmail)
+    //  Define uploadImageAndUpdate (used by updateEmail)
     fun uploadImageAndUpdate() {
         if (selectedImageUri != null) {
             val storageRef = storage.reference.child("profile_images/${user.uid}/${UUID.randomUUID()}.jpg")
@@ -478,7 +477,7 @@ private fun updateProfile(
         }
     }
 
-    // 3. Define updateEmail next (used by updatePassword)
+    //  Define updateEmail next (used by updatePassword)
     fun updateEmail() {
         if (email != user.email) {
             user.verifyBeforeUpdateEmail(email)
@@ -494,7 +493,7 @@ private fun updateProfile(
         }
     }
 
-    // 4. Entry point
+    //  Entry point
     if (currentPassword != null && newPassword != null) {
         val credential = EmailAuthProvider.getCredential(user.email!!, currentPassword)
         user.reauthenticate(credential)

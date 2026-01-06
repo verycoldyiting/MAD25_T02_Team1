@@ -49,7 +49,10 @@ fun ProfileScreen() {
                     name = doc.getString("name") ?: ""
                     phone = doc.getString("phone") ?: ""
                     profileImageUrl = doc.getString("profileImageUrl")
-                    android.util.Log.d("ProfileScreen", "Profile loaded. Image URL: $profileImageUrl")
+                    android.util.Log.d(
+                        "ProfileScreen",
+                        "Profile loaded. Image URL: $profileImageUrl"
+                    )
                 }
             }
     }
@@ -97,13 +100,11 @@ fun ProfileScreen() {
 
         Spacer(Modifier.height(35.dp))
 
+        // Edit Profile Button
         Button(
-            onClick = {
-                // Brings u to edit profile page
-                context.startActivity(Intent(context, EditProfileActivity::class.java))
-            },
+            onClick = { /* ... */ },
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Yellow,
+                containerColor = Color(0xFFF2B705), // Updated Color
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),
@@ -115,15 +116,11 @@ fun ProfileScreen() {
 
         Spacer(Modifier.height(12.dp))
 
+// Logout Button
         Button(
-            onClick = {
-                auth.signOut() // Sign user out of firebase auth
-                val intent = Intent(context, LoginScreen::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                context.startActivity(intent)
-            },
+            onClick = { /* ... */ },
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Yellow,
+                containerColor = Color(0xFFF2B705), // Updated Color
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),

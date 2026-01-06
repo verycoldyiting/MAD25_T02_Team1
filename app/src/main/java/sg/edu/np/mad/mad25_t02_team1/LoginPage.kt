@@ -38,15 +38,14 @@ class LoginScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // This allows content to go behind the status bar
         enableEdgeToEdge()
-        setContent {
 
+        setContent {
             MAD25_T02_Team1Theme {
-                // Main scaffold provides structure with padding for system bars
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    // Load the login content with proper padding
-                    LoginContent(modifier = Modifier.padding(innerPadding))
-                }
+                // Following your ProfileScreen reference:
+                // We remove the Scaffold and apply fillMaxSize directly to the content.
+                LoginContent(modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -207,8 +206,10 @@ fun LoginContent(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
+
+                // ... inside Login Button ...
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Yellow,
+                    containerColor = Color(0xFFF2B705), // Changed from Color.Yellow to Golden Yellow
                     contentColor = Color.Black
                 ),
                 border = BorderStroke(1.dp, Color.Black),

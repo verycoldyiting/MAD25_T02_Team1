@@ -6,12 +6,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -25,28 +28,29 @@ fun ProfileScreen() {
 
     //firebase setup
     val auth = FirebaseAuth.getInstance()
-    val user = auth.currentUser!!
+    val user = auth.currentUser ?: return // Handle case where user is null
     val db = FirebaseFirestore.getInstance()
 
     //will recompose the screen whenever these values change
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var profileImageUrl by remember { mutableStateOf<String?>(null) }
     val email = user.email ?: ""
 
     val context = LocalContext.current
 
-    //auto refresh
+    //auto refresh with real-time updates
     LaunchedEffect(user.uid) {
-
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
             .addSnapshotListener { snap, _ ->
-
                 //listen to firestore account document
                 if (snap != null && !snap.isEmpty) {
                     val doc = snap.documents[0]
                     name = doc.getString("name") ?: ""
                     phone = doc.getString("phone") ?: ""
+                    profileImageUrl = doc.getString("profileImageUrl")
+                    android.util.Log.d("ProfileScreen", "Profile loaded. Image URL: $profileImageUrl")
                 }
             }
     }
@@ -58,14 +62,33 @@ fun ProfileScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        AsyncImage(
-            model = null,
-            contentDescription = "",
+        // Profile Picture with proper loading
+        Box(
             modifier = Modifier
                 .size(130.dp)
                 .clip(CircleShape)
-                .background(Color.LightGray)
-        )
+                .background(Color.LightGray),
+            contentAlignment = Alignment.Center
+        ) {
+            if (profileImageUrl != null) {
+                AsyncImage(
+                    model = profileImageUrl,
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier
+                        .size(130.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                // Default icon when no profile picture
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Default Profile",
+                    modifier = Modifier.size(65.dp),
+                    tint = Color.Gray
+                )
+            }
+        }
 
         Spacer(Modifier.height(20.dp))
 
@@ -96,7 +119,9 @@ fun ProfileScreen() {
         Button(
             onClick = {
                 auth.signOut() //sign user out of firebase auth
-                context.startActivity(Intent(context, LoginScreen::class.java)) //redirect to login page
+                val intent = Intent(context, LoginScreen::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                context.startActivity(intent)
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = YELLOW,
@@ -110,4 +135,3 @@ fun ProfileScreen() {
         }
     }
 }
-

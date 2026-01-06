@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Permissions for internet, image access, and storage -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -49,6 +55,11 @@
             android:theme="@style/Theme.MAD25_T02_Team1" />
         <activity
             android:name=".BookingHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
+        <!-- NEW: Forgot Password Activity -->
+        <activity
+            android:name=".ForgotPasswordActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
     </application>

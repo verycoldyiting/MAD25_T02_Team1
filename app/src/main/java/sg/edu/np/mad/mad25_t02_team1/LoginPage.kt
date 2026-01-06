@@ -1,5 +1,6 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -7,44 +8,30 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import com.google.firebase.auth.FirebaseAuth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.remember
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
@@ -56,14 +43,7 @@ class LoginScreen : ComponentActivity() {
         setContent {
             MAD25_T02_Team1Theme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LoginScreen(
-                        onLoginSuccess = {
-                            val intent = Intent(this@LoginScreen, RegisterPage::class.java)
-                            startActivity(intent)
-                        },
-                        modifier = Modifier.padding(innerPadding)
-                    )
-
+                    LoginContent(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
@@ -71,24 +51,25 @@ class LoginScreen : ComponentActivity() {
 }
 
 @Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    modifier: Modifier = Modifier
-){
-    //store user input
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+fun LoginContent(modifier: Modifier = Modifier) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
 
     Column(
         modifier = Modifier
-            .fillMaxSize(),
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
         TicketLahHeader()
 
-        //move form lower
-        Spacer(modifier = Modifier.height(200.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
         Column(
             modifier = Modifier
@@ -96,152 +77,154 @@ fun LoginScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Text(
-                "Welcome to TicketLah!",
-                style = MaterialTheme.typography.headlineLarge
+                text = "Welcome to TicketLah!",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                "Please Login",
-                style = MaterialTheme.typography.headlineLarge
+                text = "Please Login",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.Gray
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Email Field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth()
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            var passwordVisible by remember { mutableStateOf(false) }
-
+            // Password Field
             OutlinedTextField(
-                //password input w visibility toggle
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
-                    val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(icon, contentDescription = if (passwordVisible) "Hide password" else "Show password")
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = "Toggle password visibility"
+                        )
                     }
                 },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (passwordVisible)
-                    VisualTransformation.None
-                else
-                    PasswordVisualTransformation()
+                singleLine = true
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(36.dp))
+            // Forgot Password Link
+            TextButton(
+                onClick = {
+                    val intent = Intent(context, ForgotPasswordActivity::class.java)
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(
+                    "Forgot Password?",
+                    color = YELLOW,
+                    fontSize = 14.sp
+                )
+            }
 
-            val context = LocalContext.current
-            val auth = FirebaseAuth.getInstance()
-            var loginError by remember { mutableStateOf<String?>(null) }
+            Spacer(modifier = Modifier.height(24.dp))
 
+            // Login Button
             Button(
                 onClick = {
-                    //check for empty fields
                     if (email.isBlank() || password.isBlank()) {
-                        loginError = "Please enter both email and password"
+                        Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
                     auth.signInWithEmailAndPassword(email, password)
-                        .addOnSuccessListener {
-                            //to check if uid is null; return a valid logged in user
-                            val uid = it.user?.uid
-
+                        .addOnSuccessListener { authResult ->
+                            val uid = authResult.user?.uid
                             if (uid == null) {
-                                loginError = "User not found. Please register for an account!"
+                                Toast.makeText(context, "User not found. Please register.", Toast.LENGTH_SHORT).show()
                                 return@addOnSuccessListener
                             }
 
-                            val db = FirebaseFirestore.getInstance()
-
-                            // Check if the user exists in the Account collection
+                            // Check if user exists in Firestore
                             db.collection("Account")
                                 .whereEqualTo("uid", uid)
                                 .get()
                                 .addOnSuccessListener { snap ->
-
                                     if (snap.isEmpty) {
-                                        // User authenticated but no Firestore account entry
-                                        loginError = "User not found. Please register for a new account."
-                                        return@addOnSuccessListener
+                                        Toast.makeText(context, "User not found. Please register.", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
+                                        val intent = Intent(context, HomePage::class.java)
+                                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                        context.startActivity(intent)
+                                        (context as? Activity)?.finish()
                                     }
-
-                                    // Account exists = login successful
-                                    Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
-
-                                    val intent = Intent(context, HomePage::class.java)
-                                    context.startActivity(intent)
                                 }
-                                .addOnFailureListener { err ->
-                                    loginError = err.message
+                                .addOnFailureListener {
+                                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
-
                         }
                         .addOnFailureListener {
-                            loginError = it.message
+                            Toast.makeText(context, "Login Failed: ${it.message}", Toast.LENGTH_SHORT).show()
                         }
-
                 },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = YELLOW,
                     contentColor = Color.Black
                 ),
                 border = BorderStroke(1.dp, Color.Black),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.width(160.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Login")
+                Text(
+                    text = "Login",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
 
-
-            Spacer(modifier = Modifier.height(14.dp))
-
+            // Register Button
             Button(
                 onClick = {
                     val intent = Intent(context, RegisterPage::class.java)
                     context.startActivity(intent)
                 },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = YELLOW,
                     contentColor = Color.Black
                 ),
                 border = BorderStroke(1.dp, Color.Black),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.width(160.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Register")
-            }
-
-            loginError?.let { msg ->
-                AlertDialog(
-                    onDismissRequest = { loginError = null },
-                    confirmButton = {
-                        TextButton(onClick = { loginError = null }) {
-                            Text("OK")
-                        }
-                    },
-                    title = { Text("Login Failed") },
-                    text = { Text(msg) }
+                Text(
+                    text = "Register",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
-
 }

@@ -1,6 +1,5 @@
 package sg.edu.np.mad.mad25_t02_team1
 
-import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -64,7 +63,7 @@ fun ProfileScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // Profile Picture with proper loading
+        // profile picture with proper landing
         Box(
             modifier = Modifier
                 .size(130.dp)
@@ -82,7 +81,7 @@ fun ProfileScreen() {
                     contentScale = ContentScale.Crop
                 )
             } else {
-                // Default grey icon used when no profile picture
+                // default grey icon being used as placeholder
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "Default Profile",
@@ -100,11 +99,11 @@ fun ProfileScreen() {
 
         Spacer(Modifier.height(35.dp))
 
-        // Edit Profile Button
+        // Profile Button
         Button(
             onClick = { /* ... */ },
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFF2B705), // Updated Color
+                containerColor = Color(0xFFF2B705),
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),
@@ -116,11 +115,11 @@ fun ProfileScreen() {
 
         Spacer(Modifier.height(12.dp))
 
-// Logout Button
+// logout button
         Button(
             onClick = { /* ... */ },
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFF2B705), // Updated Color
+                containerColor = Color(0xFFF2B705),
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),

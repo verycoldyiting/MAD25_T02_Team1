@@ -66,7 +66,7 @@ fun EditProfileScreen() {
     var profileImageUrl by remember { mutableStateOf<String?>(null) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Password fields
+    // password fields
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -78,21 +78,21 @@ fun EditProfileScreen() {
 
     val context = LocalContext.current
 
-    // Photo Picker for Android 13+
+    // photo picker for Android 13+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         uri?.let { selectedImageUri = it }
     }
 
-    // In the event there's a use of older Android versions, this is used as the fallback
+    // in the event there's a use of older Android versions, this is used as the fallback
     val legacyImagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { selectedImageUri = it }
     }
 
-    // Permission launcher to read media images for Android 13+
+    // permission launcher to read media images for Android 13+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -109,7 +109,7 @@ fun EditProfileScreen() {
         }
     }
 
-    // Function to handle photo selection
+    // function to handle photo selection
     fun selectPhoto() {
         when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
@@ -135,7 +135,7 @@ fun EditProfileScreen() {
         }
     }
 
-    // Load profile data
+    // load profile data
     LaunchedEffect(Unit) {
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
@@ -164,7 +164,7 @@ fun EditProfileScreen() {
         ) {
             Spacer(Modifier.height(20.dp))
 
-            // Profile Picture
+            // profile picture
             Box(
                 modifier = Modifier.size(120.dp),
                 contentAlignment = Alignment.BottomEnd
@@ -269,7 +269,7 @@ fun EditProfileScreen() {
 
             Spacer(Modifier.height(16.dp))
 
-            // Current Password
+            // current password
             OutlinedTextField(
                 value = currentPassword,
                 onValueChange = { currentPassword = it },
@@ -290,7 +290,7 @@ fun EditProfileScreen() {
 
             Spacer(Modifier.height(10.dp))
 
-            // New Password
+            // new password
             OutlinedTextField(
                 value = newPassword,
                 onValueChange = { newPassword = it },
@@ -311,7 +311,7 @@ fun EditProfileScreen() {
 
             Spacer(Modifier.height(10.dp))
 
-            // Confirm Password
+            // confirm password
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
@@ -334,7 +334,7 @@ fun EditProfileScreen() {
 
             Button(
                 onClick = {
-                    // Validation
+                    // validation
                     if (!isValidPhone(phone)) {
                         Toast.makeText(context, "Phone must start with 8 or 9 and be 8 digits.", Toast.LENGTH_SHORT).show()
                         return@Button
@@ -425,7 +425,6 @@ private fun updateProfile(
         return
     }
 
-    //  Define updateFirestore first (used by uploadImageAndUpdate)
     fun updateFirestore(imageUrl: String?) {
         db.collection("Account")
             .whereEqualTo("uid", user.uid)
@@ -459,7 +458,7 @@ private fun updateProfile(
             }
     }
 
-    //  Define uploadImageAndUpdate (used by updateEmail)
+    //  define uploadImageAndUpdate (used by updateEmail)
     fun uploadImageAndUpdate() {
         if (selectedImageUri != null) {
             val storageRef = storage.reference.child("profile_images/${user.uid}/${UUID.randomUUID()}.jpg")
@@ -477,7 +476,7 @@ private fun updateProfile(
         }
     }
 
-    //  Define updateEmail next (used by updatePassword)
+    //  define updateEmail next (used by updatePassword)
     fun updateEmail() {
         if (email != user.email) {
             user.verifyBeforeUpdateEmail(email)
@@ -493,7 +492,7 @@ private fun updateProfile(
         }
     }
 
-    //  Entry point
+    //  entry point
     if (currentPassword != null && newPassword != null) {
         val credential = EmailAuthProvider.getCredential(user.email!!, currentPassword)
         user.reauthenticate(credential)

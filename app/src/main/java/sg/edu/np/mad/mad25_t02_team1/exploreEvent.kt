@@ -50,7 +50,8 @@ fun ExploreEventsApp() {
             val result = db.collection("Events").get().await()
             val fetchedEvents = result.documents.mapNotNull { document ->
                 document.toObject(Event::class.java)?.copy(
-                    id = document.id // snsure the ID is captured from the document metadata
+                    id = document.id // e
+                // ensure the ID is captured from the document metadata
                 )
             }
             allEvents = fetchedEvents

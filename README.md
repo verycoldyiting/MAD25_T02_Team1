@@ -219,7 +219,7 @@ Natalie -
 * Displays title, artist and venue on the day of the concert/show synced on phone calendar.
   
 3. QR Code implementation
-* Generating Qr Code that contains all the booking details and retrieving all booking details once scanned. 
+* Generating Qr Code with timer for each ticket in the booking history for ticket scanning.
 
 Valerie -
 1. Chatbot

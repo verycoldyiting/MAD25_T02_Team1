@@ -216,9 +216,8 @@ Natalie -
 * Uploading of profile picture and editing of email and password which once saved will be updated to FireStore and FireBase Authentication
   
 2. Add Event to Calendar
-* Displays all details of an event, including title, artist, genre, venue, 
-description, price, date and time and general sales period.
-
+* Displays title, artist and venue on the day of the concert/show synced on phone calendar.
+  
 3. QR Code implementation
 * Generating Qr Code that contains all the booking details and retrieving all booking details once scanned. 
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +35,8 @@ import androidx.compose.ui.res.painterResource
 import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
+import androidx.navigation.compose.currentBackStackEntryAsState
+
 
 // MAIN ACTIVITY
 class HomePage : ComponentActivity() {
@@ -47,15 +50,27 @@ class HomePage : ComponentActivity() {
     }
 }
 
+sealed class AppRoute(val route: String) {
+    object Chatbot : AppRoute("chatbot")
+}
+
+
 // SCAFFOLD WITH BOTTOM BAR
 @Composable
 fun HomePageScaffold() {
 
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
 
     Scaffold(
-        topBar = { TicketLahHeader() },
+        topBar = {
+            if (currentRoute != AppRoute.Chatbot.route) {
+                TicketLahHeader()
+            }
+        },
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
@@ -70,8 +85,28 @@ fun HomePageScaffold() {
                     }
                 }
             )
-        }
-    ) { innerPadding ->
+        },
+        floatingActionButton = {
+            if (currentRoute != AppRoute.Chatbot.route) {
+                FloatingActionButton(
+                    onClick = {
+                        navController.navigate(AppRoute.Chatbot.route)
+                    },
+                    containerColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(8.dp),
+                    shape = CircleShape
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_chatbot),
+                        contentDescription = "Chatbot",
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
+    )
+    { innerPadding ->
 
         NavHost(
             navController = navController,
@@ -82,6 +117,9 @@ fun HomePageScaffold() {
             composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
             composable(BottomNavItem.Profile.route) { ProfileScreen() }
+            composable(AppRoute.Chatbot.route) {
+                ChatbotScreen(navController)
+            }
         }
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -366,24 +367,71 @@ fun EventDetailsContent(
                         Spacer(Modifier.height(12.dp))
                         InfoRow("Starting Price", "$${"%.2f".format(it)}")
                     }
+
+                    event.ageRestriction?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Age Restriction", it)
+                    }
+
+                    event.isWheelchairAccessible?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow(
+                            "Wheelchair Accessible",
+                            if (it) "Yes" else "No"
+                        )
+                    }
+
+                    event.isOutdoor?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow(
+                            "Event Type",
+                            if (it) "Outdoor" else "Indoor"
+                        )
+                    }
+
+                    event.refundPolicy?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Refund Policy", it)
+                    }
                 }
             }
         }
 
         Spacer(Modifier.height(24.dp))
+
     }
 }
 
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Text(label, color = Color.Gray, fontSize = 14.sp)
-        Text(value, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+        // Label
+        Text(
+            text = label,
+            color = Color.Gray,
+            fontSize = 14.sp,
+            modifier = Modifier.width(140.dp) // fixed label width
+        )
+
+        // Value (wraps naturally, left-aligned)
+        Text(
+            text = value,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Start
+        )
     }
 }
+
+
+
+
 /**
  * Utility to format Firebase Timestamp into readable date string
  */

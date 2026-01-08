@@ -154,184 +154,191 @@ fun EditProfileScreen() {
     Scaffold(
         topBar = { TicketLahHeader() }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(20.dp))
-
-            // profile picture
-            Box(
-                modifier = Modifier.size(120.dp),
-                contentAlignment = Alignment.BottomEnd
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+                    .padding(bottom = 80.dp), // Extra padding for button
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val displayImageUrl = selectedImageUri?.toString() ?: profileImageUrl
+                Spacer(Modifier.height(20.dp))
 
-                if (displayImageUrl != null) {
-                    Image(
-                        painter = rememberAsyncImagePainter(displayImageUrl),
-                        contentDescription = "Profile Picture",
+                // profile picture
+                Box(
+                    modifier = Modifier.size(120.dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    val displayImageUrl = selectedImageUri?.toString() ?: profileImageUrl
+
+                    if (displayImageUrl != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(displayImageUrl),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .clickable { selectPhoto() },
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .background(Color.LightGray)
+                                .clickable { selectPhoto() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Default Profile",
+                                modifier = Modifier.size(60.dp),
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { selectPhoto() },
                         modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .clickable { selectPhoto() },
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .background(Color.LightGray)
-                            .clickable { selectPhoto() },
-                        contentAlignment = Alignment.Center
+                            .size(36.dp)
+                            .background(Color(0xFFF2B705), CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Default Profile",
-                            modifier = Modifier.size(60.dp),
-                            tint = Color.Gray
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Change Picture",
+                            tint = Color.Black
                         )
                     }
                 }
 
-                IconButton(
-                    onClick = { selectPhoto() },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color.Yellow, CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Change Picture",
-                        tint = Color.Black
-                    )
-                }
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = "Profile Details",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone Number") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(32.dp))
+
+                Text(
+                    text = "Change Password",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    text = "Leave blank if you don't want to change password",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                // current password
+                OutlinedTextField(
+                    value = currentPassword,
+                    onValueChange = { currentPassword = it },
+                    label = { Text("Current Password") },
+                    visualTransformation = if (showCurrentPassword)
+                        VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showCurrentPassword = !showCurrentPassword }) {
+                            Icon(
+                                imageVector = if (showCurrentPassword)
+                                    Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle password visibility"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                // new password
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    label = { Text("New Password") },
+                    visualTransformation = if (showNewPassword)
+                        VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showNewPassword = !showNewPassword }) {
+                            Icon(
+                                imageVector = if (showNewPassword)
+                                    Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle password visibility"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                // confirm password
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirm New Password") },
+                    visualTransformation = if (showConfirmPassword)
+                        VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
+                            Icon(
+                                imageVector = if (showConfirmPassword)
+                                    Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle password visibility"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(40.dp))
             }
 
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                text = "Profile Details",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
-                label = { Text("Phone Number") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(32.dp))
-
-            Text(
-                text = "Change Password",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = "Leave blank if you don't want to change password",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // current password
-            OutlinedTextField(
-                value = currentPassword,
-                onValueChange = { currentPassword = it },
-                label = { Text("Current Password") },
-                visualTransformation = if (showCurrentPassword)
-                    VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showCurrentPassword = !showCurrentPassword }) {
-                        Icon(
-                            imageVector = if (showCurrentPassword)
-                                Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = "Toggle password visibility"
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            // new password
-            OutlinedTextField(
-                value = newPassword,
-                onValueChange = { newPassword = it },
-                label = { Text("New Password") },
-                visualTransformation = if (showNewPassword)
-                    VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showNewPassword = !showNewPassword }) {
-                        Icon(
-                            imageVector = if (showNewPassword)
-                                Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = "Toggle password visibility"
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            // confirm password
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirm New Password") },
-                visualTransformation = if (showConfirmPassword)
-                    VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
-                        Icon(
-                            imageVector = if (showConfirmPassword)
-                                Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = "Toggle password visibility"
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(25.dp))
-
+            // Save button at bottom
             Button(
                 onClick = {
                     // validation
@@ -383,24 +390,26 @@ fun EditProfileScreen() {
                 },
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Yellow,
+                    containerColor = Color(0xFFF2B705),
                     contentColor = Color.Black
                 ),
                 border = BorderStroke(1.dp, Color.Black),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.width(200.dp)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(24.dp),
                         color = Color.Black
                     )
                 } else {
-                    Text("Save Changes")
+                    Text("Save Changes", fontWeight = FontWeight.Bold)
                 }
             }
-
-            Spacer(Modifier.height(20.dp))
         }
     }
 }
@@ -458,7 +467,6 @@ private fun updateProfile(
             }
     }
 
-    //  define uploadImageAndUpdate (used by updateEmail)
     fun uploadImageAndUpdate() {
         if (selectedImageUri != null) {
             val storageRef = storage.reference.child("profile_images/${user.uid}/${UUID.randomUUID()}.jpg")
@@ -476,7 +484,6 @@ private fun updateProfile(
         }
     }
 
-    //  define updateEmail next (used by updatePassword)
     fun updateEmail() {
         if (email != user.email) {
             user.verifyBeforeUpdateEmail(email)
@@ -492,7 +499,6 @@ private fun updateProfile(
         }
     }
 
-    //  entry point
     if (currentPassword != null && newPassword != null) {
         val credential = EmailAuthProvider.getCredential(user.email!!, currentPassword)
         user.reauthenticate(credential)

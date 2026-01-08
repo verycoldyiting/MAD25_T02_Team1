@@ -1,5 +1,6 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
@@ -63,6 +65,8 @@ fun ProfileScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
+        Spacer(Modifier.height(20.dp))
+
         // profile picture with proper landing
         Box(
             modifier = Modifier
@@ -93,40 +97,60 @@ fun ProfileScreen() {
 
         Spacer(Modifier.height(20.dp))
 
-        Text(name, style = MaterialTheme.typography.headlineSmall)
-        Text(email)
-        Text(phone)
+        Text(
+            text = name,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(email, color = Color.Gray)
+        Text(phone, color = Color.Gray)
 
         Spacer(Modifier.height(35.dp))
 
-        // Profile Button
+        // Edit Profile Button
         Button(
-            onClick = { /* ... */ },
+            onClick = {
+                val intent = Intent(context, EditProfileActivity::class.java)
+                context.startActivity(intent)
+            },
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFF2B705),
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.width(160.dp)
+            modifier = Modifier
+                .width(160.dp)
+                .height(48.dp)
         ) {
-            Text("Edit Profile")
+            Text("Edit Profile", fontWeight = FontWeight.Medium)
         }
 
         Spacer(Modifier.height(12.dp))
 
-// logout button
+        // Logout button
         Button(
-            onClick = { /* ... */ },
+            onClick = {
+                // Sign out from Firebase
+                auth.signOut()
+
+                // Navigate to login screen and clear back stack
+                val intent = Intent(context, LoginScreen::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                context.startActivity(intent)
+            },
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFFF2B705),
                 contentColor = Color.Black
             ),
             border = BorderStroke(1.dp, Color.Black),
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.width(160.dp)
+            modifier = Modifier
+                .width(160.dp)
+                .height(48.dp)
         ) {
-            Text("Logout")
+            Text("Logout", fontWeight = FontWeight.Medium)
         }
     }
 }

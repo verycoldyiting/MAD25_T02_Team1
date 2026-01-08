@@ -219,7 +219,7 @@ Natalie -
 * Displays title, artist and venue on the day of the concert/show synced on phone calendar.
   
 3. QR Code implementation
-* Generating Qr Code with timer for each ticket in the booking history for ticket scanning.
+* Generating Qr Code with timer for each ticket in the booking history for ticket scanning. (This code creates a dynamic QR code display for each concert ticket with an automatic refresh timer. When the ticket card loads, it generates a unique QR code containing the booking details (ticket ID, event name, seat section, and category) plus a timestamp. A background timer counts down from 60 seconds, displayed as "Next refresh in X seconds" below the QR code. When the countdown reaches zero, the system automatically generates a completely new QR code by updating the timestamp, making each QR code unique and different from the previous one. This 60-second cycle repeats infinitely as long as the ticket is displayed, providing a constantly changing security QR code that never shows the same pattern twice. The entire process happens automatically without any user interaction or stored image files - everything is generated in real-time using the ZXing library.)
 
 Valerie -
 1. Chatbot

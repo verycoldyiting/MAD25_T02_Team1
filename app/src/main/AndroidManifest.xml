@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Calendar permissions - required for direct calendar insertion -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
@@ -22,6 +25,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MAD25_T02_Team1"
         tools:targetApi="31">
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBTFyZwPZn2UmtDWxRZCIPKIRI3_YLooxY" />
         <activity
             android:name=".LoginScreen"
             android:exported="true"
@@ -63,6 +70,10 @@
             android:theme="@style/Theme.MAD25_T02_Team1" />
         <activity
             android:name=".ForgotPasswordActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MAD25_T02_Team1" />
+        <activity
+            android:name=".VenueMapActivity"
             android:exported="false"
             android:theme="@style/Theme.MAD25_T02_Team1" />
 

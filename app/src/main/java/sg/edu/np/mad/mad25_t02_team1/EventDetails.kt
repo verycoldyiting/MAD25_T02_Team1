@@ -1,6 +1,7 @@
 package sg.edu.np.mad.mad25_t02_team1
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -308,8 +309,15 @@ fun EventDetailsContent(
                         Text(event.venue ?: "Venue TBA", fontWeight = FontWeight.Medium)
                     }
 
-                    OutlinedButton(onClick = {}) {
-                        Text("See On Maps", fontSize = 12.sp)
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(context, VenueMapActivity::class.java).apply {
+                                putExtra("VENUE_NAME", event.venue ?: "Singapore")
+                            }
+                            context.startActivity(intent)
+                        }
+                    ) {
+                        Text("See on Map")
                     }
                 }
             }

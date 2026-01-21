@@ -167,8 +167,13 @@ fun BookingHistoryScreen() {
                 booking to booking.eventId?.let { eventMap[it] }
             }
 
+            // Sort by event date - latest events first (descending order)
+            val sortedPairs = eventBookingPairs.sortedByDescending { (_, event) ->
+                event?.date?.toDate()?.time ?: 0L
+            }
+
             // update state with fetched data
-            bookingWithEvents = eventBookingPairs
+            bookingWithEvents = sortedPairs
 
         } catch (e: Exception) {
             Log.e("BookingHistory", "Error fetching data", e)
@@ -369,113 +374,76 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
-            // qr code with countdown timer
-            QRCodeWithTimer(booking = booking)
-        }
-    }
-}
+            // Check if event has passed (for expired ticket detection)
+            val currentTime = System.currentTimeMillis()
+            val eventTime = event?.date?.toDate()?.time ?: 0L
+            val isExpired = eventTime > 0 && currentTime > eventTime
 
-// qr code component that generates unique codes every 60 seconds
-@Composable
-fun QRCodeWithTimer(booking: Booking) {
-    var qrCounter by remember { mutableStateOf(0) }
-    var countdown by remember { mutableStateOf(60) }
-    var randomSeed by remember { mutableStateOf(System.currentTimeMillis()) }
-
-    // background timer
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000)
-            countdown--
-            // when countdown hits 0, generate new qr code
-            if (countdown <= 0) {
-                qrCounter++
-                // reset countdown to 60 seconds
-                countdown = 60
-            }
-        }
-    }
-
-    val currentQRData = "TICKET:${booking.id}:${booking.concertTitle}:${booking.section}:${booking.category}:TIME:$randomSeed"
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Your QR Code",
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-        val qrBitmap = remember(currentQRData) { generateQRCode(currentQRData) }
-        qrBitmap?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = "Ticket QR Code",
-                modifier = Modifier
-                    .size(200.dp)
-                    .border(
-                        width = 2.dp,
-                        color = Color.Black,
-                        shape = RoundedCornerShape(8.dp)
+            // Show either "View QR Code" button OR "QR Code Expired" box
+            if (isExpired) {
+                // EXPIRED TICKET - Show gray box (not clickable)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFE0E0E0)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = "QR Code Expired",
+                            modifier = Modifier.size(20.dp),
+                            tint = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "QR Code Expired",
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else {
+                // ACTIVE TICKET - Show yellow button (clickable)
+                Button(
+                    onClick = {
+                        val intent = android.content.Intent(context, QRCodeActivity::class.java).apply {
+                            putExtra("BOOKING_ID", booking.id)
+                            putExtra("EVENT_NAME", event?.name ?: booking.concertTitle ?: "")
+                            putExtra("ARTIST", event?.artist ?: "")
+                            putExtra("VENUE", event?.venue ?: "")
+                            putExtra("DATE_MILLIS", event?.date?.toDate()?.time ?: 0L)
+                            putExtra("CATEGORY", booking.category ?: "")
+                            putExtra("SECTION", booking.section ?: "")
+                            putExtra("QUANTITY", booking.quantity ?: 1)
+                            putExtra("PRICE_PER_TICKET", (booking.totalPrice ?: 0.0) / (booking.quantity ?: 1))
+                        }
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFEB3B), // Yellow
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Event,
+                        contentDescription = "QR Code",
+                        modifier = Modifier.size(20.dp)
                     )
-                    .background(Color.White)
-                    .padding(8.dp)
-            )
-        } ?: run {
-            // show error box if qr generation failed
-            Box(
-                modifier = Modifier
-                    .size(200.dp)
-                    .background(Color.LightGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("QR Code Error", color = Color.Red)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("View QR Code", fontWeight = FontWeight.Bold)
+                }
             }
         }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // countdown timer text updating every second
-        Text(
-            text = "Next refresh in $countdown seconds",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-// generate qr code bitmap from text data using zxing library
-fun generateQRCode(data: String, size: Int = 512): Bitmap? {
-    return try {
-        // create qr code writer
-        val writer = QRCodeWriter()
-
-        // encode text into qr matrix (512x512 pixels)
-        val bitMatrix = writer.encode(data, BarcodeFormat.QR_CODE, size, size)
-
-        // get matrix dimensions
-        val width = bitMatrix.width
-        val height = bitMatrix.height
-
-        // create empty bitmap
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-
-        // loop through each pixel and set black or white
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                // black pixel if matrix true, white if false
-                bitmap.setPixel(x, y, if (bitMatrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-            }
-        }
-        bitmap
-    } catch (e: Exception) {
-        Log.e("QRCode", "Error generating QR code", e)
-        null
     }
 }
 

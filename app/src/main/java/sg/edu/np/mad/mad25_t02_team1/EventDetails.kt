@@ -336,54 +336,10 @@ fun EventDetailsContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // Extra info
-        if (event.artist != null || event.genre != null || event.price != null) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-
-                    Text(
-                        "Event Information",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-
-                    event.artist?.let {
-                        Spacer(Modifier.height(12.dp))
-                        InfoRow("Artist", it)
-                    }
-
-                    event.genre?.let {
-                        Spacer(Modifier.height(12.dp))
-                        InfoRow("Genre", it)
-                    }
-
-                    event.price?.let {
-                        Spacer(Modifier.height(12.dp))
-                        InfoRow("Starting Price", "$${"%.2f".format(it)}")
-                    }
-                }
-            }
-        }
-
         Spacer(Modifier.height(24.dp))
     }
 }
 
-@Composable
-fun InfoRow(label: String, value: String) {
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, color = Color.Gray, fontSize = 14.sp)
-        Text(value, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-    }
-}
 /**
  * Utility to format Firebase Timestamp into readable date string
  */

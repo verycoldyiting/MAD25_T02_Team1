@@ -17,6 +17,7 @@ material3AdaptiveNavigationSuite = "1.4.0"
 navigationCompose = "2.7.5"
 navigationComposeVersion = "2.7.5"
 smartReplyCommon = "16.1.0"
+roomCompiler = "2.8.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +42,7 @@ androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compo
 androidx-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "material3AdaptiveNavigationSuite" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationComposeVersion" }
 smart-reply-common = { group = "com.google.mlkit", name = "smart-reply-common", version.ref = "smartReplyCommon" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "roomCompiler" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

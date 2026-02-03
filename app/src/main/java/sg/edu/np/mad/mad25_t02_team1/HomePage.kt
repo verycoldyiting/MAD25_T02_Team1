@@ -26,7 +26,6 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
-import sg.edu.np.mad.mad25_t02_team1.ui.BookingHistoryScreen
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.compose.ui.Alignment
@@ -38,7 +37,6 @@ import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.navigation.compose.currentBackStackEntryAsState
 
 
-// MAIN ACTIVITY
 class HomePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +56,7 @@ sealed class AppRoute(val route: String) {
 // SCAFFOLD WITH BOTTOM BAR
 @Composable
 fun HomePageScaffold() {
-
+    // initialise nav controller to manage app navigation state
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -76,6 +74,7 @@ fun HomePageScaffold() {
                 selectedItem = selectedTab,
                 onItemSelected = { item ->
                     selectedTab = item
+                    // implementation of standard navigation logic, this logic prevents multiple copies of the same destination
                     navController.navigate(item.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
@@ -162,7 +161,6 @@ fun HomePageContent() {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-
         Text(
             text = "Upcoming Events",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -173,6 +171,7 @@ fun HomePageContent() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // horizontal scrolling for the featured 'Upcoming' section
         if (upcomingEvents.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(upcomingEvents) { event ->
@@ -202,6 +201,7 @@ fun HomePageContent() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // vertical scrolling for the main event list
         LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             items(availableEvents) { event ->
                 AvailableEventCard(
@@ -219,11 +219,7 @@ fun HomePageContent() {
 
 // UPCOMING EVENT CARD
 @Composable
-fun UpcomingEventCard(
-    event: Event,
-    onClick: () -> Unit
-) {
-
+fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
     var imageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
@@ -233,6 +229,7 @@ fun UpcomingEventCard(
 
         imageUrl = if (gsUrl.startsWith("gs://")) {
             try {
+
                 FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl)
                     .downloadUrl.await().toString()
             } catch (e: Exception) {
@@ -295,20 +292,15 @@ fun UpcomingEventCard(
     }
 }
 
-// AVAILABLE EVENT CARD
 @Composable
-fun AvailableEventCard(
-    event: Event,
-    onClick: () -> Unit
-) {
-
+fun AvailableEventCard(event: Event, onClick: () -> Unit) {
     var imageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // image logic mirrored here for consistency across both card types
     LaunchedEffect(event.eventImage) {
         isLoading = true
         val gsUrl = event.eventImage?.trim().orEmpty()
-
         imageUrl = if (gsUrl.startsWith("gs://")) {
             try {
                 FirebaseStorage.getInstance().getReferenceFromUrl(gsUrl)
@@ -319,7 +311,6 @@ fun AvailableEventCard(
         } else {
             gsUrl
         }
-
         isLoading = false
     }
 
@@ -332,19 +323,15 @@ fun AvailableEventCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-
         Column {
-
             Box(
                 modifier = Modifier
                     .height(180.dp)
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-
                 if (isLoading) {
                     CircularProgressIndicator()
-
                 } else if (!imageUrl.isNullOrEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)

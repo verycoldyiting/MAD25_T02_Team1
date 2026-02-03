@@ -33,14 +33,9 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 
-
-/**
- * ExploreEventsApp
- * Contains the logic for fetching events, searching by artist, and filtering by genre.
- */
 @Composable
 fun ExploreEventsApp() {
-    // State Hoisting: Managing UI state for search queries and data lists
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var allEvents by remember { mutableStateOf<List<Event>>(emptyList()) }
@@ -49,24 +44,18 @@ fun ExploreEventsApp() {
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
 
-    // Asynchronous Data Fetching:
-    // Runs once when the composable enters the composition.
-    // Fetches events from Firestore and populates the genre list dynamically.
-
     LaunchedEffect(Unit) {
         try {
             val db = FirebaseFirestore.getInstance()
-            // Coroutine suspend function call (.await()) to prevent blocking the UI thread
             val result = db.collection("Events").get().await()
-
             val fetchedEvents = result.documents.mapNotNull { document ->
                 document.toObject(Event::class.java)?.copy(
-                    id = document.id // Ensure the ID is captured from the document metadata
+                    id = document.id // snsure the ID is captured from the document metadata
                 )
             }
             allEvents = fetchedEvents
 
-            // Extract unique genres for the filter dropdown
+            // extracts unique genres for the filter dropdown
             availableGenres = fetchedEvents.mapNotNull { it.genre }
                 .filter { it.isNotEmpty() }
                 .distinct()
@@ -76,9 +65,9 @@ fun ExploreEventsApp() {
         }
     }
 
-    // Reactive Filtering Logic:
-    // Recalculates 'displayedEvents' only when search, genre, or the list changes.
-    // This optimization ensures we don't re-filter on every single frame.
+    // reactive filter logic
+    // recalculates 'displayedEvents' only when search, genre, or the list changes.
+
     val displayedEvents = remember(searchQuery, selectedGenre, allEvents) {
         allEvents.filter { event ->
             // Search Requirement: Matches Artist OR Event Name
@@ -103,7 +92,7 @@ fun ExploreEventsApp() {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // UI Component: Search Bar + Filter Icon
+            // search bar and filter icons
             SearchBarWithFilter(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -115,7 +104,7 @@ fun ExploreEventsApp() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // LazyColumn: Efficiently renders only the visible items on screen
+            // lazy column
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
@@ -151,7 +140,7 @@ fun SearchBarWithFilter(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Standard Material TextField for user input
+
         TextField(
             value = query,
             onValueChange = onQueryChange,
@@ -174,13 +163,13 @@ fun SearchBarWithFilter(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Filter Dropdown logic
+        // filter Dropdown logic
         Box {
             IconButton(onClick = { showMenu = true }) {
                 Icon(
                     imageVector = Icons.Outlined.FilterAlt,
                     contentDescription = "Filter",
-                    // Visual cue: Change color if a filter is active
+                    // change colour if a filter is active
                     tint = if (selectedGenre != null) MaterialTheme.colorScheme.primary else Color.Gray
                 )
             }
@@ -190,7 +179,7 @@ fun SearchBarWithFilter(
                 onDismissRequest = { showMenu = false },
                 modifier = Modifier.background(Color.White)
             ) {
-                // Option to reset filter
+                // reset filter
                 DropdownMenuItem(
                     text = { Text("All Genres", fontWeight = FontWeight.Bold) },
                     onClick = {
@@ -198,9 +187,9 @@ fun SearchBarWithFilter(
                         showMenu = false
                     }
                 )
-                Divider()
 
-                // Dynamically list available genres
+
+                // list available genres
                 availableGenres.forEach { genre ->
                     DropdownMenuItem(
                         text = { Text(genre, color = if (selectedGenre == genre) MaterialTheme.colorScheme.primary else Color.Black) },
@@ -220,7 +209,7 @@ fun EventCard(
     event: Event,
     onClick: () -> Unit
 ) {
-    // To manage the final resolved image URL (handling gs:// vs https://)
+    // manages the final resolved image URL (handling gs:// + https://)
     var finalImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoadingImage by remember { mutableStateOf(true) }
 
@@ -263,7 +252,7 @@ fun EventCard(
                     .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
-                // Loading State vs Success State for Image
+                // loading state vs success state for image
                 if (isLoadingImage) {
                     CircularProgressIndicator()
                 } else if (finalImageUrl != null) {
@@ -299,7 +288,7 @@ fun EventCard(
                 }
             }
 
-            // Event Details Section
+            // event details section
             Column(modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp)) {

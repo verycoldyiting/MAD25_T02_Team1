@@ -35,6 +35,7 @@ import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.TimeZone
 
 class EventDetailsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -435,8 +436,21 @@ fun InfoRow(label: String, value: String) {
 /**
  * Utility to format Firebase Timestamp into readable date string
  */
+//fun formatDate(ts: com.google.firebase.Timestamp?): String {
+//    if (ts == null) return "Date TBA"
+//    return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
+//        .format(ts.toDate())
+//}
+
 fun formatDate(ts: com.google.firebase.Timestamp?): String {
     if (ts == null) return "Date TBA"
-    return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
-        .format(ts.toDate())
+
+    val formatter = SimpleDateFormat(
+        "EEE, MMM dd yyyy h:mm a",
+        Locale.getDefault()
+    )
+
+    formatter.timeZone = TimeZone.getTimeZone("Asia/Singapore")
+
+    return formatter.format(ts.toDate())
 }

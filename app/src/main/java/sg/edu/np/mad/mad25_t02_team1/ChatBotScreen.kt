@@ -1,10 +1,16 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+
 import android.app.Activity
 import android.app.Application
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.speech.RecognizerIntent
 import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.ManagedActivityResultLauncher
+//import androidx.activity.result.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -14,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -25,15 +30,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.airbnb.lottie.compose.*
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -46,15 +55,15 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import sg.edu.np.mad.mad25_t02_team1.models.FAQ
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import sg.edu.np.mad.mad25_t02_team1.models.SeatCategory
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 import java.util.UUID
 import kotlin.math.min
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.layout.ContentScale
+import androidx.activity.result.ActivityResult
+
+
 
 // ==========================================
 // 1. REPOSITORY (The Memory Vault)
@@ -68,8 +77,14 @@ object ChatRepository {
     private val _suggestedPrompts = MutableStateFlow<List<String>>(emptyList())
     val suggestedPrompts = _suggestedPrompts.asStateFlow()
 
-    // Context Memory
+    // Context Memory: Stores the Event currently being discussed
     var selectedEvent: Event? = null
+
+    fun clearContext() {
+        selectedEvent = null
+        // Uncomment the line below if you ALSO want to clear the chat history bubbles every time
+        // _messages.value = listOf(defaultMessage)
+    }
 
     fun addMessage(msg: ChatMessage) {
         val currentList = _messages.value.toMutableList()
@@ -84,18 +99,28 @@ object ChatRepository {
     fun setPrompts(prompts: List<String>) {
         _suggestedPrompts.value = prompts
     }
+
+    fun updateMessage(
+        messageId: String,
+        updater: (ChatMessage) -> ChatMessage
+    ) {
+        _messages.value = _messages.value.map { msg ->
+            if (msg.id == messageId) updater(msg) else msg
+        }
+    }
 }
 
 // ==========================================
 // 2. UTILITIES (Math & Online Translation)
 // ==========================================
-
 object LevenshteinUtils {
+    // Calculates the "edit distance" between two strings (how many typos apart they are)
     fun calculate(lhs: CharSequence, rhs: CharSequence): Int {
         val len0 = lhs.length + 1
         val len1 = rhs.length + 1
         var cost = IntArray(len0) { it }
         var newCost = IntArray(len0)
+
         for (j in 1 until len1) {
             newCost[0] = j
             for (i in 1 until len0) {
@@ -112,97 +137,100 @@ object LevenshteinUtils {
     fun isCloseMatch(input: String, target: String, threshold: Int = 2): Boolean {
         val normalizedInput = input.lowercase().trim()
         val normalizedTarget = target.lowercase().trim()
+
         if (normalizedInput == normalizedTarget) return true
         if (Math.abs(normalizedInput.length - normalizedTarget.length) > threshold) return false
+
         return calculate(normalizedInput, normalizedTarget) <= threshold
     }
 }
 
 class TranslationHelper {
+    // Ensure you have a valid API Key in your BuildConfig or replace this with a string literal
+    private val apiKey = BuildConfig.MY_API_KEY
 
-    // ⚠️ PASTE YOUR COPIED API KEY HERE!
-    private val API_KEY = "AIzaSyAVrdNkbQNSGypxY1uVDoS5LygCLkwTG4U"
+    suspend fun detectLanguage(text: String): String = withContext(Dispatchers.IO) {
+        try {
+            Log.d("API_KEY_CHECK", "Key length=${apiKey.length}")
+            val url = "https://translation.googleapis.com/language/translate/v2/detect?key=$apiKey"
+            val body = JSONObject().put("q", text)
+            val response = postJson(url, body.toString())
 
-    // Online Detection using Google Cloud API
-    suspend fun detectLanguage(text: String): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                val urlString = "https://translation.googleapis.com/language/translate/v2/detect?key=$API_KEY"
-                val jsonBody = JSONObject().put("q", text)
-
-                val response = postJson(urlString, jsonBody.toString())
-                val data = JSONObject(response).getJSONObject("data")
-                val detections = data.getJSONArray("detections")
-                if (detections.length() > 0) {
-                    val firstItem = detections.getJSONArray(0).getJSONObject(0)
-                    firstItem.getString("language")
-                } else {
-                    "en"
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                "en" // Default to English on error
-            }
+            JSONObject(response)
+                .getJSONObject("data")
+                .getJSONArray("detections")
+                .getJSONArray(0)
+                .getJSONObject(0)
+                .getString("language")
+        } catch (e: Exception) {
+            "en"
         }
     }
 
-    // Online Translation using Google Cloud API
     suspend fun translate(text: String, targetLang: String, sourceLang: String? = null): String {
-        if (targetLang == "en" && sourceLang == "en") return text
+        if (targetLang == sourceLang) return text
 
         return withContext(Dispatchers.IO) {
             try {
-                val urlString = "https://translation.googleapis.com/language/translate/v2?key=$API_KEY"
-                val jsonBody = JSONObject()
-                jsonBody.put("q", text)
-                jsonBody.put("target", targetLang)
-                jsonBody.put("format", "text")
-                if (sourceLang != null) {
-                    jsonBody.put("source", sourceLang)
+                val urlString =
+                    "https://translation.googleapis.com/language/translate/v2?key=$apiKey"
+                val jsonBody = JSONObject().apply {
+                    put("q", text)
+                    put("target", targetLang)
+                    sourceLang?.let { put("source", it) }
                 }
-
                 val response = postJson(urlString, jsonBody.toString())
+                Log.d("ChatBot", "Raw Translation Response: $response")
+
                 val data = JSONObject(response).getJSONObject("data")
                 val translations = data.getJSONArray("translations")
-                if (translations.length() > 0) {
-                    translations.getJSONObject(0).getString("translatedText")
-                } else {
-                    text
-                }
+                val rawText = translations.getJSONObject(0).getString("translatedText")
+
+                // Decode the HTML entities back to normal text (e.g. &#39; -> ')
+                HtmlCompat.fromHtml(rawText, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
             } catch (e: Exception) {
-                e.printStackTrace()
-                text // Return original text on error
+                Log.e("ChatBot", "Translation Error", e)
+                text
             }
         }
     }
 
-    // Helper to send network request without extra libraries
     private fun postJson(urlString: String, jsonBody: String): String {
         val url = URL(urlString)
-        val conn = url.openConnection() as HttpURLConnection
-        conn.requestMethod = "POST"
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-        conn.doOutput = true
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            doOutput = true
+        }
 
         conn.outputStream.use { os ->
             os.write(jsonBody.toByteArray(Charsets.UTF_8))
         }
 
-        return conn.inputStream.use { stream ->
-            BufferedReader(InputStreamReader(stream)).readText()
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val text = stream.bufferedReader().use { it.readText() }
+
+        if (code !in 200..299) {
+            Log.e("TRANSLATE_HTTP", "HTTP $code: $text")
         }
+        return text
     }
 }
 
 // ==========================================
-// 3. VIEWMODEL (The Brain)
+// 3. VIEWMODEL (The A+ Brain)
 // ==========================================
-
 sealed class ChatMessage(val id: String = UUID.randomUUID().toString()) {
     data class User(val text: String) : ChatMessage()
-    data class Bot(val text: String) : ChatMessage()
+    data class Bot(
+        val text: String,
+        val language: String = "en",
+        val translatedText: String? = null,
+        val showTranslateButton: Boolean = false
+    ) : ChatMessage()
+
     data class BotEvent(val event: Event) : ChatMessage()
-    // --- NEW: A message type that holds a LIST of events ---
     data class BotCarousel(val events: List<Event>) : ChatMessage()
     object Loading : ChatMessage()
 }
@@ -210,25 +238,74 @@ sealed class ChatMessage(val id: String = UUID.randomUUID().toString()) {
 class ChatbotViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
     private val translator = TranslationHelper()
-
     val messages = ChatRepository.messages
     val suggestedPrompts = ChatRepository.suggestedPrompts
 
     private var eventsList: List<Event> = emptyList()
     private var faqList: List<FAQ> = emptyList()
+    private var seatCategoryList: List<SeatCategory> = emptyList()
+
 
     init {
+        ChatRepository.clearContext()
         viewModelScope.launch {
             try {
+                // Fetch All Data
                 val eventSnapshot = db.collection("Events").get().await()
                 eventsList = eventSnapshot.documents.mapNotNull { it.toObject(Event::class.java) }
+
                 val faqSnapshot = db.collection("FAQ").get().await()
                 faqList = faqSnapshot.documents.mapNotNull { it.toObject(FAQ::class.java) }
+
+                val seatSnapshot = db.collection("SeatCategory").get().await()
+                seatCategoryList =
+                    seatSnapshot.documents.mapNotNull { it.toObject(SeatCategory::class.java) }
 
                 if (ChatRepository.suggestedPrompts.value.isEmpty()) {
                     updateSuggestedPrompts("en")
                 }
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun isEventSpecificQuestion(input: String): Boolean {
+        val keywords = listOf(
+            "rain", "weather", "outdoor",
+            "wheelchair", "accessible",
+            "refund", "policy",
+            "age", "kids", "child",
+            "time", "late", "parking",
+            "food", "drink", "beverage", "alcohol"
+        )
+        return keywords.any { input.contains(it) }
+    }
+
+    private fun isGenericFaqQuestion(input: String): Boolean {
+        val genericFaqKeywords = listOf(
+            "food", "drink", "beverage",
+            "seat", "seating",
+            "parking",
+            "payment", "pay",
+            "refund", "policy"
+        )
+        return genericFaqKeywords.any { input.contains(it) }
+    }
+
+
+    fun translateBotMessage(messageId: String, text: String, sourceLang: String) {
+        viewModelScope.launch {
+            val translated = translator.translate(
+                text = text,
+                targetLang = "en",
+                sourceLang = sourceLang
+            )
+            ChatRepository.updateMessage(messageId) { msg ->
+                if (msg is ChatMessage.Bot) {
+                    msg.copy(translatedText = translated)
+                } else msg
+            }
         }
     }
 
@@ -245,139 +322,486 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
             } else inputText
 
             val clean = englishInput.lowercase()
+            val normalizedInput = clean
+                .replace("-", "")
+                .replace(" ", "")
 
-            // --- NEW: INTERCEPT "UPCOMING" REQUESTS HERE ---
-            if (clean.contains("upcoming") || (clean.contains("show") && clean.contains("event")) || clean.contains("list event") || clean.contains("what event")) {
+            // ------------------------------------------------------------------
+            // FEATURE 1: GENRE SEARCH (Enhanced to use GenreNormalized)
+            // ------------------------------------------------------------------
+            // Collect ALL keywords from GenreNormalized AND the main Genre string
+            val allGenreTags = eventsList.flatMap {
+                it.genreNormalized.map { t -> t.lowercase().replace("-", "").replace(" ", "") }
+            }.distinct()
+
+            // Find if any of the tags appear in user input
+            val foundGenre = allGenreTags.find { tag -> normalizedInput.contains(tag) }
+
+            if (foundGenre != null) {
+                removeLoading()
+                // Filter events matching the genre found
+                val genreEvents = eventsList.filter { event ->
+                    event.genreNormalized.any {
+                        it.lowercase().replace("-", "").replace(" ", "") == foundGenre
+                    }
+                }
+
+                // 🔥 FIX 1: DO NOT auto-select the event here.
+                // Just show the carousel. Keep context null so the next question remains generic.
+                ChatRepository.selectedEvent = null
+
+//                if (genreEvents.size == 1) {
+//                    ChatRepository.selectedEvent = genreEvents.first()
+//                }
+
+//                if (genreEvents.size == 1) {
+//                    ChatRepository.selectedEvent = genreEvents.first()
+//                } else {
+//                    ChatRepository.selectedEvent = null
+//                }
+
+
+                if (genreEvents.isNotEmpty()) {
+                    addMessage(ChatMessage.Bot("Here are the ${foundGenre.replaceFirstChar { it.uppercase() }} events:"))
+                    addMessage(ChatMessage.BotCarousel(genreEvents))
+                } else {
+                    addMessage(ChatMessage.Bot("I couldn't find any events for $foundGenre."))
+                }
+                return@launch
+            }
+
+            // ------------------------------------------------------------------
+            // FEATURE 1: Month/Upcoming Filtering (UPDATED with Number Extraction)
+            // ------------------------------------------------------------------
+            val isMonthRequest =
+                clean.contains("jan") || clean.contains("feb") || clean.contains("mar") || clean.contains(
+                    "apr"
+                ) ||
+                        clean.contains("may") || clean.contains("jun") || clean.contains("jul") || clean.contains(
+                    "aug"
+                ) ||
+                        clean.contains("sep") || clean.contains("oct") || clean.contains("nov") || clean.contains(
+                    "dec"
+                )
+
+            // Updated check to catch "coming", "next", "show me events"
+            val isGeneralRequest =
+                clean.contains("upcoming") || clean.contains("coming") || clean.contains("next") || (clean.contains(
+                    "show"
+                ) && clean.contains("event"))
+
+            if (isMonthRequest || isGeneralRequest) {
                 removeLoading()
                 if (eventsList.isEmpty()) {
                     addMessage(ChatMessage.Bot("I'm currently updating my database. Please check back later!"))
-                } else {
-                    addMessage(ChatMessage.Bot("Here are some events you might like:"))
-                    // Show top 5 events in a fancy carousel
-                    addMessage(ChatMessage.BotCarousel(eventsList.take(5)))
+                    return@launch
                 }
-                updateSuggestedPrompts(detectedLang)
+
+                val allEventsSorted = eventsList.sortedBy { it.date }
+
+                // Month Logic
+                val monthMap = mapOf(
+                    "jan" to 0, "january" to 0,
+                    "feb" to 1, "february" to 1,
+                    "mar" to 2, "march" to 2,
+                    "apr" to 3, "april" to 3,
+                    "may" to 4,
+                    "jun" to 5, "june" to 5,
+                    "jul" to 6, "july" to 6,
+                    "aug" to 7, "august" to 7,
+                    "sep" to 8, "september" to 8,
+                    "oct" to 9, "october" to 9,
+                    "nov" to 10, "november" to 10,
+                    "dec" to 11, "december" to 11
+                )
+
+                val foundMonth = monthMap.entries.find { clean.contains(it.key) }
+                if (foundMonth != null) {
+                    val targetMonthIndex = foundMonth.value
+                    val monthName = foundMonth.key.replaceFirstChar { it.uppercase() }
+
+                    val filteredEvents = allEventsSorted.filter { event ->
+                        event.date?.toDate()?.month == targetMonthIndex
+                    }
+
+                    if (filteredEvents.isNotEmpty()) {
+                        addMessage(ChatMessage.Bot("Here are the events happening in $monthName:"))
+                        addMessage(ChatMessage.BotCarousel(filteredEvents))
+                    } else {
+                        addMessage(ChatMessage.Bot("I couldn't find any events in $monthName."))
+                    }
+                    return@launch
+                }
+
+                // General "Upcoming" Logic - NOW EXTRACTS THE NUMBER
+                // 1. Find a digit in the user's string
+                val numberRegex = Regex("\\d+")
+                val numberMatch = numberRegex.find(clean)
+                // 2. If digit found, use it. If not, default to 5.
+                val countToTake = numberMatch?.value?.toIntOrNull()?.coerceIn(1, 10) ?: 5
+
+                addMessage(ChatMessage.Bot("Here are the next $countToTake upcoming events:"))
+                addMessage(ChatMessage.BotCarousel(allEventsSorted.take(countToTake)))
                 return@launch
             }
-            // ------------------------------------------------
 
-            // 2. Standard Logic
-            val responseEnglish = generateBotResponse(englishInput)
+            // ------------------------------------------------------------------
+            // FEATURE 2: Smart Ranking (Event Search)
+            // ------------------------------------------------------------------
+            // Check if user is searching for a NEW event (e.g. "Got Blackpink?")
+//            val newEventFound = checkForEventMatch(englishInput)
+//            if (newEventFound != null) {
+//                ChatRepository.selectedEvent = newEventFound
+//                currentContextEvent = newEventFound
+//            }
 
-            // 3. Translate Back
+//            val newEventFound =
+//                if (isFollowUpQuestion(englishInput)) {
+//                    null // 🔥 DO NOT re-detect event
+//                } else {
+//                    checkForEventMatch(englishInput)
+//                }
+//
+//            if (newEventFound != null) {
+//                ChatRepository.selectedEvent = newEventFound
+//                currentContextEvent = newEventFound
+//            }
+
+            val newEventFound =
+                if (ChatRepository.selectedEvent != null && isEventSpecificQuestion(englishInput)) {
+                    null   // keep current event context
+                } else {
+                    checkForEventMatch(englishInput)
+                }
+
+            if (newEventFound != null) {
+                ChatRepository.selectedEvent = newEventFound
+            }
+
+
+            // ------------------------------------------------------------------
+            // FEATURE 3: Smart Response (Context Injection)
+            // ------------------------------------------------------------------
+            val responseEnglish = generateSmartResponse(englishInput, newEventFound)
+
+            // Translate back
             val finalResponse = if (detectedLang != "en") {
                 translator.translate(responseEnglish, detectedLang, "en")
             } else responseEnglish
 
             removeLoading()
-            addMessage(ChatMessage.Bot(finalResponse))
 
-            checkForEventMatch(englishInput)?.let { event ->
-                // Don't duplicate if we just showed it in a carousel, but for search it's fine
-                addMessage(ChatMessage.BotEvent(event))
+            // Always add the bot text
+            addMessage(
+                ChatMessage.Bot(
+                    text = finalResponse,
+                    language = detectedLang,
+                    showTranslateButton = detectedLang != "en"
+                )
+            )
+
+            // Only show event card if this was an explicit event discovery
+            if (newEventFound != null && !isEventSpecificQuestion(englishInput)) {
+                addMessage(ChatMessage.BotEvent(newEventFound))
             }
+
             updateSuggestedPrompts(detectedLang)
+
+
+//            if (newEventFound != null) {
+//                addMessage(
+//                    ChatMessage.Bot(
+//                        text = finalResponse,
+//                        language = detectedLang, // Save the detected language (e.g., "zh")
+//                        showTranslateButton = detectedLang != "en" // Only show button if not English
+//                    )
+//                )
+//                addMessage(ChatMessage.BotEvent(newEventFound))
+//            } else {
+//                addMessage(
+//                    ChatMessage.Bot(
+//                        text = finalResponse,
+//                        language = detectedLang, // Save the detected language
+//                        showTranslateButton = detectedLang != "en" // Only show button if not English
+//                    )
+//                )
+//            }
+//            updateSuggestedPrompts(detectedLang)
         }
     }
 
-    private fun generateBotResponse(input: String): String {
-        val clean = input.lowercase().trim().replace("&#39;", "'").replace("&quot;", "\"")
-        val userWords = clean.split("\\s+".toRegex())
+    // 🧠 BRAIN: Context-Aware Response Generator
+    private fun generateSmartResponse(input: String, newEvent: Event?): String {
+        val clean = input.lowercase()
 
-        val newEvent = checkForEventMatch(clean)
-        var contextEvent = ChatRepository.selectedEvent
-        var prefix = ""
+        // 1. Resolve context
+        val targetEvent = newEvent ?: ChatRepository.selectedEvent
 
-        if (newEvent != null) {
-            ChatRepository.selectedEvent = newEvent
-            contextEvent = newEvent
-            prefix = "I found ${newEvent.name}. "
-        }
+        // =====================================================
+        // PRIORITY 1: Event-aware answers (NO FAQ YET)
+        // =====================================================
+        if (targetEvent != null && isEventSpecificQuestion(clean)) {
 
-        if (clean.contains("other event") || clean.contains("another event") || clean.contains("general")) {
-            ChatRepository.selectedEvent = null
-            return "Sure, what else can I help you with?"
-        }
-
-        val answerParts = mutableListOf<String>()
-
-        if (contextEvent != null) {
-            if (clean.contains("wheelchair") || clean.contains("accessible") || clean.contains("disability")) {
-                val isAccessible = contextEvent.isWheelchairAccessible == true
-                if (isAccessible) answerParts.add("Yes! It is wheelchair accessible.")
-                else answerParts.add("I'm sorry, it is not listed as wheelchair accessible.")
-            }
-            if (clean.contains("rain") || clean.contains("weather") || clean.contains("outdoor") || clean.contains("indoor")) {
-                val isOutdoor = contextEvent.isOutdoor == true
-                if (isOutdoor) answerParts.add("This is an outdoor event. Bring an umbrella!")
-                else answerParts.add("Don't worry, it is an indoor event.")
-            }
-            if (clean.contains("kid") || clean.contains("child") || clean.contains("age") ||
-                clean.contains("18") || clean.contains("baby") || clean.contains("girl") ||
-                clean.contains("boy") || clean.contains("yo") || clean.contains("year old")) {
-                val restriction = contextEvent.ageRestriction ?: "No specific age restriction listed."
-                answerParts.add("The age policy is: $restriction.")
-            }
-            if (clean.contains("refund") || clean.contains("cancel") || clean.contains("change")) {
-                answerParts.add(contextEvent.refundPolicy ?: "Check ticket page for refund info.")
-            }
-            if (clean.contains("venue") || clean.contains("where") || clean.contains("location")) {
-                answerParts.add("It's happening at ${contextEvent.venue}.")
-            }
-            if (clean.contains("price") || clean.contains("cost") || clean.contains("how much")) {
-                answerParts.add("Tickets start from $${contextEvent.price}.")
-            }
-            if (clean.contains("when") || clean.contains("time") || clean.contains("start")) {
-                answerParts.add("Scheduled for: ${contextEvent.date?.toDate() ?: "TBA"}.")
+            // 🌧️ Rain / Weather
+            if (clean.contains("rain") || clean.contains("weather")) {
+                return when (targetEvent.isOutdoor) {
+                    true -> "This is an **outdoor event**, so weather conditions may affect the show. Please check official announcements closer to the event date."
+                    false -> "This is an **indoor event**, so weather conditions will not affect the event."
+                    else -> "Please check official announcements for weather-related updates for this event."
+                }
             }
 
-            // Food / Drink logic from FAQ db
-            if (clean.contains("food") || clean.contains("drink") || clean.contains("water")) {
-                // This will be caught by the FAQ check below, so we let it pass through
+            // ♿ Wheelchair accessibility
+            if (clean.contains("wheelchair") || clean.contains("accessible")) {
+                return when (targetEvent.isWheelchairAccessible) {
+                    true -> "Yes, **${targetEvent.venue ?: "this venue"}** is wheelchair accessible."
+                    false -> "Unfortunately, **${targetEvent.venue ?: "this venue"}** is not wheelchair accessible based on current information."
+                    else -> "Please check directly with **${targetEvent.venue ?: "the venue"}** regarding wheelchair accessibility."
+                }
             }
         }
 
-        val matchedFaq = faqList.sortedByDescending { it.priority }.find { faq ->
-            faq.keywords.any { k ->
-                val keywordLower = k.lowercase()
-                userWords.contains(keywordLower) || LevenshteinUtils.isCloseMatch(keywordLower, clean)
+
+        // =====================================================
+        // PRIORITY 2: FAQ (with event injection)
+        // =====================================================
+        val matchedFaq = faqList
+            .filter { faq ->
+                faq.keywords.any { k ->
+                    val kLower = k.lowercase()
+                    Regex("\\b${Regex.escape(kLower)}\\b").containsMatchIn(clean) ||
+                            LevenshteinUtils.isCloseMatch(kLower, clean, 1)
+                }
             }
-        }
+            .maxByOrNull { it.priority }
 
         if (matchedFaq != null) {
-            val alreadyAnsweredRefunds = answerParts.any { it.contains("refund", ignoreCase = true) }
-            val faqIsAboutRefunds = matchedFaq.keywords.any { it.contains("refund") || it.contains("cancel") }
-            if (!(alreadyAnsweredRefunds && faqIsAboutRefunds)) {
-                answerParts.add(matchedFaq.answer ?: "")
+            val genericAnswer = matchedFaq.answer ?: "I'm not sure."
+
+            // 🔥 FIX 3: STRICT Context Check
+            // Only inject event details if we have a REALLY firm grasp on the event.
+            // If the user hasn't mentioned an event name, and we don't have a new discovery,
+            // and the previous context is null, RETURN GENERIC.
+
+            if (targetEvent != null) {
+                return customizeAnswerForEvent(
+                    matchedFaq.category,
+                    genericAnswer,
+                    targetEvent
+                )
+            } else {
+                return genericAnswer
             }
         }
 
-        if (answerParts.isNotEmpty()) {
-            return prefix + answerParts.joinToString(" ")
+
+        // =====================================================
+        // PRIORITY 3: Event discovery
+        // =====================================================
+        if (newEvent != null) {
+            return "I found **${newEvent.name}**! You can ask me about tickets, venue, timing, or accessibility."
         }
 
-        if (clean == "hi" || clean == "hello" || clean.startsWith("hi ") || clean.startsWith("hello ")) {
-            return "Hello! How can I help?"
+        // =====================================================
+        // PRIORITY 4: Small talk
+        // =====================================================
+        if (Regex("^(hi|hello|hey)\\b", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "Hello! I can help answer questions about upcoming concerts and events."
         }
 
-        if (prefix.isNotEmpty()) {
-            return "I found an event featuring ${contextEvent?.artist}! You can ask me about tickets, venue, age limits, or weather."
-        }
-
-        return "I'm not sure. Try asking about tickets, venues, or specific artists!"
+        // =====================================================
+        // PRIORITY 5: Fallback
+        // =====================================================
+        return "I'm not sure. Try asking about a specific artist, genre (like 'Pop'), or event details."
     }
 
-    private fun checkForEventMatch(input: String): Event? {
-        val lower = input.lowercase()
-        return eventsList.find { e ->
-            e.artistNormalized.any { LevenshteinUtils.isCloseMatch(lower, it, 2) || lower.contains(it) } ||
-                    (e.name?.lowercase()?.contains(lower) == true)
+
+    // ✨ THE SMART DATA INJECTOR ✨
+    // Uses the 'category' from Firestore FAQ to decide what data to inject
+    private fun customizeAnswerForEvent(
+        category: String?,
+        genericAnswer: String,
+        event: Event
+    ): String {
+        return when (category) {
+            "tickets", "payment" -> {
+                // LOGIC: Calculate price range from SeatCategory collection
+                val prices = seatCategoryList.map { it.price }
+                if (prices.isNotEmpty()) {
+                    val minPrice = prices.minOrNull() ?: 0.0
+                    val maxPrice = prices.maxOrNull() ?: 0.0
+                    // Format nicely (e.g., 199.00)
+                    val minStr = String.format("%.2f", minPrice)
+                    val maxStr = String.format("%.2f", maxPrice)
+                    "For **${event.artist}**, ticket prices range from **$$minStr to $$maxStr**. $genericAnswer"
+                } else {
+                    "For ${event.artist}, check the app for specific pricing. $genericAnswer"
+                }
+            }
+
+            "venue", "parking", "food" -> {
+                // Injects Venue Name
+                "This event is at **${event.venue}**. $genericAnswer"
+            }
+
+            "timing", "late_entry" -> {
+                // Injects Date
+                "The event starts on **${formatDate(event.date)}**. $genericAnswer"
+            }
+
+            "refunds", "policy" -> {
+                // Check if your Event model has a 'refundPolicy' field.
+                // If not, replace 'event.refundPolicy' with whatever field holds "No refunds after purchase"
+                val policy = event.refundPolicy ?: "Standard rules apply"
+                "For **${event.artist}**, the policy is: **$policy**. $genericAnswer"
+            }
+
+            "accessibility", "wheelchair", "disability", "handicap" -> {
+                // Check the boolean field from your Event.kt
+                val accessText = when (event.isWheelchairAccessible) {
+                    true -> "Yes, **${event.venue ?: "the venue"}** is wheelchair accessible."
+                    false -> "Unfortunately, this event has limited wheelchair accessibility."
+                    else -> "Please check directly with the venue regarding accessibility."
+                }
+                "$accessText $genericAnswer"
+            }
+
+            "age", "child", "children", "kids", "restriction", "baby" -> {
+                // Check the String field from your Event.kt
+                val restriction = event.ageRestriction
+                val ageText = if (!restriction.isNullOrBlank()) {
+                    "The age policy for this event is: **$restriction**."
+                } else {
+                    "There is no specific age restriction listed for this event."
+                }
+                "$ageText $genericAnswer"
+            }
+
+            "genre", "style", "type" -> {
+                val genreText = event.genre ?: "General"
+                "This is a **$genreText** event. $genericAnswer"
+            }
+
+            else -> genericAnswer
         }
+    }
+
+    // SMART RANKING SYSTEM (Improved context detection)
+    // In ChatbotViewModel class...
+
+    private fun checkForEventMatch(input: String): Event? {
+        val lowerInput = input.lowercase()
+        val inputSquashed = lowerInput.replace(Regex("[^a-z0-9]"), "")
+
+        val scoredEvents = eventsList.map { event ->
+            // 1. Exact/Close Artist Match (High Confidence)
+            val artistScore = calculateMatchScore(event.artist ?: "", lowerInput, inputSquashed)
+
+            // 2. Exact/Close Event Name Match (High Confidence)
+            val nameScore = calculateMatchScore(event.name ?: "", lowerInput, inputSquashed)
+
+            // 🔥 FIX 2: REMOVED the "partial keyword" logic.
+            // Previously, if artist was "Blue", and you typed "Blue sky", it triggered.
+            // Now it must match the fuzzy logic (Levenshtein) of the full name or significant parts.
+
+            val bestScore = maxOf(artistScore, nameScore)
+            Pair(event, bestScore)
+        }
+
+        // Increased threshold slightly to prevent false positives
+        val bestMatch = scoredEvents.maxByOrNull { it.second }
+        return if (bestMatch != null && bestMatch.second > 0.7) bestMatch.first else null
+    }
+//    private fun checkForEventMatch(input: String): Event? {
+//        val lowerInput = input.lowercase()
+//        val inputSquashed = lowerInput.replace(Regex("[^a-z0-9]"), "")
+//
+//        // 1. Score every event
+//        val scoredEvents = eventsList.map { event ->
+//            val artistScore = calculateMatchScore(
+//                event.artist ?: "",
+//                lowerInput,
+//                inputSquashed
+//            )
+//            val nameScore = calculateMatchScore(
+//                event.name ?: "",
+//                lowerInput,
+//                inputSquashed
+//            )
+//
+//            // Partial keyword match (e.g. "blue concert")
+//            val keywordScore = if (event.artist
+//                    ?.lowercase()
+//                    ?.split(" ")
+//                    ?.any { lowerInput.contains(it) } == true
+//            ) 0.9 else 0.0
+//
+//            val bestScore = maxOf(artistScore, nameScore, keywordScore)
+//            Pair(event, bestScore)
+//        }
+//
+//        // 2. Pick the best match
+//        val bestMatch = scoredEvents.maxByOrNull { it.second }
+//
+//        // 3. Confidence threshold
+//        return if (bestMatch != null && bestMatch.second > 0.6) {
+//            bestMatch.first
+//        } else {
+//            null
+//        }
+//    }
+
+    // 🧮 SCORING MATH
+    private fun calculateMatchScore(
+        target: String,
+        userInput: String,
+        userSquashed: String
+    ): Double {
+        val targetLower = target.lowercase()
+        val targetSquashed = targetLower.replace(Regex("[^a-z0-9]"), "")
+
+        if (targetSquashed.isEmpty()) return 0.0
+        if (userInput == targetLower) return 1.0
+        if (userInput.contains(targetLower)) return 1.0
+        if (userSquashed.contains(targetSquashed)) return 0.9
+
+        val len = targetSquashed.length
+        if (userSquashed.length >= len) {
+            var minDistance = Int.MAX_VALUE
+            for (i in 0..userSquashed.length - len) {
+                val chunk = userSquashed.substring(i, i + len)
+                val distance = LevenshteinUtils.calculate(chunk, targetSquashed)
+                if (distance < minDistance) minDistance = distance
+            }
+            val errorRatio = minDistance.toDouble() / len.toDouble()
+            if (errorRatio < 0.35) return 1.0 - errorRatio
+        } else {
+            // For abbreviations like "blk pnk"
+            if (isSubsequence(userSquashed, targetSquashed)) {
+                if (userSquashed.length.toDouble() / targetSquashed.length.toDouble() > 0.5) return 0.85
+            }
+        }
+        return 0.0
+    }
+
+    // Helper for abbreviations
+    private fun isSubsequence(s1: String, s2: String): Boolean {
+        var i = 0
+        var j = 0
+        while (i < s1.length && j < s2.length) {
+            if (s1[i] == s2[j]) {
+                i++
+            }
+            j++
+        }
+        return i == s1.length
     }
 
     private suspend fun updateSuggestedPrompts(targetLang: String) {
         val raw = faqList.mapNotNull { it.question }.shuffled().take(3)
-        val finalPrompts = if (targetLang == "en") raw else raw.map { translator.translate(it, targetLang, "en") }
+        val finalPrompts = if (targetLang == "en") raw else raw.map {
+            translator.translate(it, targetLang, "en")
+        }
         ChatRepository.setPrompts(finalPrompts)
     }
 
@@ -385,214 +809,427 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
     private fun removeLoading() = ChatRepository.removeLoading()
 }
 
-// ==========================================
-// 4. UI SCREEN
-// ==========================================
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ChatbotScreen(navController: NavController, viewModel: ChatbotViewModel = viewModel()) {
-    val messages by viewModel.messages.collectAsState()
-    val prompts by viewModel.suggestedPrompts.collectAsState()
-    var inputText by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
-
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (it.resultCode == Activity.RESULT_OK) {
-            it.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { text ->
-                viewModel.processUserMessage(text)
-            }
-        }
+fun launchSpeechRecognizer(
+    context: Context,
+    launcher: ManagedActivityResultLauncher<Intent, ActivityResult>
+) {
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(
+            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+        )
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-    }
-
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Joe Yi (Bot)", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, "Back") }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            )
-        }
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                items(messages) { msg ->
-                    when (msg) {
-                        is ChatMessage.User -> UserMessageBubble(msg.text)
-                        is ChatMessage.Bot -> BotMessageBubble(msg.text)
-                        is ChatMessage.BotEvent -> EventCardBubble(msg.event)
-                        is ChatMessage.BotCarousel -> EventsCarousel(msg.events, navController) // NEW UI
-                        is ChatMessage.Loading -> LoadingAnimationBubble()
-                    }
-                }
-            }
-            if (prompts.isNotEmpty()) {
-                LazyRow(contentPadding = PaddingValues(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(prompts) { p -> SuggestionChip(onClick = { viewModel.processUserMessage(p) }, label = { Text(p) }) }
-                }
-            }
-            Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = {
-                    try { speechLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)) } catch (_: Exception) {}
-                }) { Icon(Icons.Default.Mic, "Mic") }
-                OutlinedTextField(
-                    value = inputText, onValueChange = { inputText = it }, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                    placeholder = { Text("Ask something...") }, shape = RoundedCornerShape(24.dp)
-                )
-                IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.processUserMessage(inputText); inputText = "" } }) { Icon(Icons.Default.Send, "Send") }
-            }
-        }
+    try {
+        launcher.launch(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Speech recognition not supported", Toast.LENGTH_SHORT).show()
     }
 }
 
-// --- UI Components ---
 
+// ==========================================
+// 4. UI SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatbotScreen(navController: NavController, viewModel: ChatbotViewModel = viewModel()) {
+        val messages by viewModel.messages.collectAsState()
+        val prompts by viewModel.suggestedPrompts.collectAsState()
+        var inputText by remember { mutableStateOf("") }
+        val listState = rememberLazyListState()
+
+        val context = LocalContext.current
+
+        val speechLauncher =
+            rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    val spokenText =
+                        result.data
+                            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                            ?.firstOrNull()
+
+                    if (!spokenText.isNullOrBlank()) {
+                        viewModel.processUserMessage(spokenText)
+                    }
+                }
+            }
+
+        val permissionLauncher =
+            rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                if (granted) {
+                    launchSpeechRecognizer(context, speechLauncher)
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Microphone permission required",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+
+
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("TicketLah! Assistant Bot", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.Default.ArrowBack, "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                )
+            }
+        ) { padding ->
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(messages) { msg ->
+                        when (msg) {
+                            is ChatMessage.User -> UserMessageBubble(msg.text)
+                            is ChatMessage.Bot -> BotMessageBubble(
+                                message = msg,
+                                onTranslateClick = {
+                                    viewModel.translateBotMessage(
+                                        msg.id,
+                                        msg.text,
+                                        msg.language
+                                    )
+                                }
+                            )
+
+                            is ChatMessage.BotEvent -> EventCardBubble(msg.event)
+                            is ChatMessage.BotCarousel -> EventsCarousel(msg.events, navController)
+                            is ChatMessage.Loading -> LoadingAnimationBubble()
+                        }
+                    }
+                }
+
+                if (prompts.isNotEmpty()) {
+                    LazyRow(
+                        contentPadding = PaddingValues(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(prompts) { p ->
+                            SuggestionChip(
+                                onClick = { viewModel.processUserMessage(p) },
+                                label = { Text(p) })
+                        }
+                    }
+                }
+
+                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.RECORD_AUDIO
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            launchSpeechRecognizer(context, speechLauncher)
+                        }
+                    }) {
+                        Icon(Icons.Default.Mic, "Mic")
+                    }
+
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
+                        placeholder = { Text("Ask something...") },
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    IconButton(onClick = {
+                        if (inputText.isNotBlank()) {
+                            viewModel.processUserMessage(inputText); inputText = ""
+                        }
+                    }) {
+                        Icon(Icons.Default.Send, "Send")
+                    }
+                }
+            }
+        }
+}
+
+
+// --- UI Components ---
 @Composable
 fun EventsCarousel(events: List<Event>, navController: NavController) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 8.dp)
-    ) {
-        items(events) { event ->
-            CompactEventCard(event) // Defined below
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            items(events) { event ->
+                CompactEventCard(event) // Defined below
+            }
         }
-    }
 }
 
 @Composable
 fun CompactEventCard(event: Event) {
-    val context = LocalContext.current
-    var imageUrl by remember { mutableStateOf<String?>(null) }
+        val context = LocalContext.current
+        var imageUrl by remember { mutableStateOf<String?>(null) }
 
-    // Image Loader for the Carousel Cards
-    LaunchedEffect(event.eventImage) {
-        val rawUrl = event.eventImage?.trim().orEmpty()
-        if (rawUrl.startsWith("gs://")) {
-            try {
-                imageUrl = FirebaseStorage.getInstance()
-                    .getReferenceFromUrl(rawUrl)
-                    .downloadUrl.await().toString()
-            } catch (e: Exception) { imageUrl = null }
-        } else { imageUrl = rawUrl }
-    }
-
-    Card(
-        modifier = Modifier
-            .width(160.dp) // Fixed width for nice carousel look
-            .height(220.dp)
-            .clickable {
-                val intent = Intent(context, EventDetailsActivity::class.java)
-                intent.putExtra("EVENT_ID", event.id)
-                context.startActivity(intent)
-            },
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-        Column {
-            Box(Modifier.height(120.dp).fillMaxWidth()) {
-                if (!imageUrl.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context).data(imageUrl).crossfade(true).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize().background(Color.Gray)) // Placeholder
+        // Image Loader for the Carousel Cards
+        LaunchedEffect(event.eventImage) {
+            val rawUrl = event.eventImage?.trim().orEmpty()
+            if (rawUrl.startsWith("gs://")) {
+                try {
+                    imageUrl = FirebaseStorage.getInstance()
+                        .getReferenceFromUrl(rawUrl)
+                        .downloadUrl.await().toString()
+                } catch (e: Exception) {
+                    imageUrl = null
                 }
-            }
-            Column(Modifier.padding(8.dp)) {
-                Text(
-                    text = event.artist ?: "Event",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = event.date?.toDate().toString().take(10) ?: "Upcoming",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray
-                )
-                Spacer(Modifier.weight(1f))
-                Text("View >", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+            } else {
+                imageUrl = rawUrl
             }
         }
-    }
-}
 
-@Composable
-fun EventCardBubble(event: Event) {
-    val context = LocalContext.current
-    var imageUrl by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(event.eventImage) {
-        val rawUrl = event.eventImage?.trim().orEmpty()
-        if (rawUrl.startsWith("gs://")) {
-            try {
-                imageUrl = FirebaseStorage.getInstance().getReferenceFromUrl(rawUrl).downloadUrl.await().toString()
-            } catch (e: Exception) { imageUrl = null }
-        } else { imageUrl = rawUrl }
-    }
-
-    Card(Modifier.padding(8.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(Modifier.padding(16.dp)) {
-            if (!imageUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context).data(imageUrl).crossfade(true).build(),
-                    contentDescription = "Event Image",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(150.dp).padding(bottom = 8.dp)
-                )
-            }
-            Text("EVENT FOUND", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(4.dp))
-            Text(event.artist ?: "Artist", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-            Text(event.name ?: "Event")
-            Spacer(Modifier.height(8.dp))
-            Text("📍 " + (event.venue ?: "Venue"))
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = {
+        Card(
+            modifier = Modifier
+                .width(160.dp) // Fixed width for nice carousel look
+                .height(220.dp)
+                .clickable {
                     val intent = Intent(context, EventDetailsActivity::class.java)
                     intent.putExtra("EVENT_ID", event.id)
                     context.startActivity(intent)
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("View Details") }
+            elevation = CardDefaults.cardElevation(4.dp)
+        ) {
+            Column {
+                Box(
+                    Modifier
+                        .height(120.dp)
+                        .fillMaxWidth()
+                ) {
+                    if (!imageUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(imageUrl).crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(Modifier.fillMaxSize().background(Color.Gray)) // Placeholder
+                    }
+                }
+                Column(Modifier.padding(8.dp)) {
+                    Text(
+                        text = event.artist ?: "Event",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = event.date?.toDate().toString().take(10) ?: "Upcoming",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "View >",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
         }
-    }
+}
+
+@Composable
+fun EventCardBubble(event: Event) {
+        val context = LocalContext.current
+        var imageUrl by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(event.eventImage) {
+            val rawUrl = event.eventImage?.trim().orEmpty()
+            if (rawUrl.startsWith("gs://")) {
+                try {
+                    imageUrl =
+                        FirebaseStorage.getInstance()
+                            .getReferenceFromUrl(rawUrl).downloadUrl.await()
+                            .toString()
+                } catch (e: Exception) {
+                    imageUrl = null
+                }
+            } else {
+                imageUrl = rawUrl
+            }
+        }
+
+        Card(
+            Modifier
+                .padding(8.dp)
+                .fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(imageUrl).crossfade(true)
+                            .build(),
+                        contentDescription = "Event Image",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .padding(bottom = 8.dp)
+                    )
+                }
+                Text(
+                    "EVENT FOUND",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    event.artist ?: "Artist",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(event.name ?: "Event")
+                Spacer(Modifier.height(8.dp))
+                Text("📍 " + (event.venue ?: "Venue"))
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(context, EventDetailsActivity::class.java)
+                        intent.putExtra("EVENT_ID", event.id)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("View Details")
+                }
+            }
+        }
 }
 
 @Composable
 fun UserMessageBubble(text: String) {
-    Box(Modifier.fillMaxWidth().padding(4.dp), contentAlignment = Alignment.CenterEnd) {
-        Surface(shape = RoundedCornerShape(16.dp, 0.dp, 16.dp, 16.dp), color = MaterialTheme.colorScheme.primary) {
-            Text(text, Modifier.padding(12.dp), color = Color.White)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(4.dp), contentAlignment = Alignment.CenterEnd
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp, 0.dp, 16.dp, 16.dp),
+                color = MaterialTheme.colorScheme.primary
+            ) {
+                Text(text, Modifier.padding(12.dp), color = Color.White)
+            }
         }
-    }
 }
 
 @Composable
-fun BotMessageBubble(text: String) {
-    Box(Modifier.fillMaxWidth().padding(4.dp), contentAlignment = Alignment.CenterStart) {
-        Surface(shape = RoundedCornerShape(0.dp, 16.dp, 16.dp, 16.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-            Text(text, Modifier.padding(12.dp), color = Color.Black)
-        }
+fun BotMessageBubble(
+        message: ChatMessage.Bot,
+        onTranslateClick: () -> Unit
+) {
+    Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            contentAlignment = Alignment.CenterStart
+
+    ) {
+            Surface(
+                shape = RoundedCornerShape(0.dp, 16.dp, 16.dp, 16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    // 1. The Main (Foreign) Text
+                    Text(
+                        text = message.text,
+                        color = Color.Black
+                    )
+
+                    // 2. The Translated (English) Text - Only shows if it exists
+                    if (message.translatedText != null) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = Color.Gray.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "${message.translatedText}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.DarkGray,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+
+                    // 3. The "Translate" Button - Only shows if not English & not yet translated
+                    if (message.showTranslateButton && message.translatedText == null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "See original (English)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable { onTranslateClick() }
+                                .padding(4.dp) // Add padding for easier clicking
+                        )
+                    }
+                }
+            }
     }
 }
 
 @Composable
 fun LoadingAnimationBubble() {
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(sg.edu.np.mad.mad25_t02_team1.R.raw.loading_dots))
-    if (composition != null) {
-        LottieAnimation(composition, iterations = LottieConstants.IterateForever, modifier = Modifier.size(50.dp))
-    } else {
-        Text("Thinking...", modifier = Modifier.padding(8.dp))
+    val composition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(
+            sg.edu.np.mad.mad25_t02_team1.R.raw.loading_dots
+        )
+    )
+
+    Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            contentAlignment = Alignment.CenterStart
+    ) {
+            Surface(
+                shape = RoundedCornerShape(0.dp, 16.dp, 16.dp, 16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Box(
+                    modifier = Modifier.padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (composition != null) {
+                        LottieAnimation(
+                            composition = composition,
+                            iterations = LottieConstants.IterateForever,
+                            modifier = Modifier.size(50.dp)
+                        )
+                    } else {
+                        Text("Thinking...")
+                    }
+                }
+            }
     }
 }
+

@@ -1,3 +1,17 @@
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
+val apiKey = localProperties.getProperty("MY_API_KEY") ?: ""
+
+
+
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
@@ -5,9 +19,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
 }
 
+
 android {
     namespace = "sg.edu.np.mad.mad25_t02_team1"
     compileSdk = 36
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "sg.edu.np.mad.mad25_t02_team1"
@@ -15,6 +35,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        buildConfigField(
+            "String",
+            "MY_API_KEY",
+            "\"${localProperties.getProperty("MY_API_KEY")}\""
+        )
+
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -38,9 +64,7 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-    buildFeatures {
-        compose = true
-    }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
     }
@@ -82,8 +106,11 @@ dependencies {
 
 
 
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.google.zxing:core:3.5.2")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.smart.reply.common)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

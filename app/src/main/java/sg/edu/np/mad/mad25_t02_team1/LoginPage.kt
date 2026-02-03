@@ -43,11 +43,11 @@ class LoginScreen : FragmentActivity() {
 
         val auth = FirebaseAuth.getInstance()
 
-        // ✅ Read biometric preference (default = enabled)
+        // Read biometric preference (default = enabled)
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val biometricEnabled = prefs.getBoolean("biometric_enabled", true)
 
-        // ✅ Biometric gate (ONLY if user logged in AND enabled)
+        // Biometric gate (ONLY if user logged in AND enabled)
         if (auth.currentUser != null && biometricEnabled) {
             val biometricHelper = BiometricAuthHelper(this)
 
@@ -65,7 +65,8 @@ class LoginScreen : FragmentActivity() {
             }
         }
 
-        // ✅ Normal email/password login UI
+        //
+        // Normal email/password login UI
         enableEdgeToEdge()
         setContent {
             MAD25_T02_Team1Theme {

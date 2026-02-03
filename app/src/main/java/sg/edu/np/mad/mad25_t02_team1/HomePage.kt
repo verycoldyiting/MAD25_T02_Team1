@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +34,8 @@ import androidx.compose.ui.res.painterResource
 import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
+import androidx.navigation.compose.currentBackStackEntryAsState
+
 
 class HomePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,14 +48,27 @@ class HomePage : ComponentActivity() {
     }
 }
 
+sealed class AppRoute(val route: String) {
+    object Chatbot : AppRoute("chatbot")
+}
+
+
+// SCAFFOLD WITH BOTTOM BAR
 @Composable
 fun HomePageScaffold() {
     // initialise nav controller to manage app navigation state
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
 
     Scaffold(
-        topBar = { TicketLahHeader() },
+        topBar = {
+            if (currentRoute != AppRoute.Chatbot.route) {
+                TicketLahHeader()
+            }
+        },
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
@@ -68,8 +84,28 @@ fun HomePageScaffold() {
                     }
                 }
             )
-        }
-    ) { innerPadding ->
+        },
+        floatingActionButton = {
+            if (currentRoute != AppRoute.Chatbot.route) {
+                FloatingActionButton(
+                    onClick = {
+                        navController.navigate(AppRoute.Chatbot.route)
+                    },
+                    containerColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(8.dp),
+                    shape = CircleShape
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_chatbot),
+                        contentDescription = "Chatbot",
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
+    )
+    { innerPadding ->
 
         NavHost(
             navController = navController,
@@ -80,12 +116,17 @@ fun HomePageScaffold() {
             composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
             composable(BottomNavItem.Profile.route) { ProfileScreen() }
+            composable(AppRoute.Chatbot.route) {
+                ChatbotScreen(navController)
+            }
         }
     }
 }
 
+// PAGE CONTENT
 @Composable
 fun HomePageContent() {
+
     var upcomingEvents by remember { mutableStateOf(listOf<Event>()) }
     var availableEvents by remember { mutableStateOf(listOf<Event>()) }
     val context = LocalContext.current
@@ -94,17 +135,19 @@ fun HomePageContent() {
         val listener = FirebaseFirestore.getInstance()
             .collection("Events")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-
+                if (error != null) {
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
 
                     val allEvents = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Event::class.java)
                     }
 
-                    // sorts events by date and partitioning into 'Upcoming' vs 'All'
+                    // Sort by date field from new model
                     val sorted = allEvents.sortedBy { it.date }
-                    upcomingEvents = sorted.take(3) // get top 3 for the horizontal row
+
+                    upcomingEvents = sorted.take(3)
                     availableEvents = sorted
                 }
             }
@@ -174,6 +217,7 @@ fun HomePageContent() {
     }
 }
 
+// UPCOMING EVENT CARD
 @Composable
 fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
     var imageUrl by remember { mutableStateOf<String?>(null) }
@@ -194,6 +238,7 @@ fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
         } else {
             gsUrl
         }
+
         isLoading = false
     }
 
@@ -206,7 +251,9 @@ fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
+
         Column {
+
             Box(
                 modifier = Modifier
                     .height(150.dp)
@@ -216,8 +263,8 @@ fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
 
                 if (isLoading) {
                     CircularProgressIndicator()
-                } else if (!imageUrl.isNullOrEmpty()) {
 
+                } else if (!imageUrl.isNullOrEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(imageUrl)

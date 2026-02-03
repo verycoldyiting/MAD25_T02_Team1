@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -34,6 +35,7 @@ import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.YELLOW
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.TimeZone
 
 class EventDetailsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -336,15 +338,119 @@ fun EventDetailsContent(
 
         Spacer(Modifier.height(16.dp))
 
+        // Extra info
+        if (event.artist != null || event.genre != null || event.price != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+
+                    Text(
+                        "Event Information",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+
+                    event.artist?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Artist", it)
+                    }
+
+                    event.genre?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Genre", it)
+                    }
+
+                    event.price?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Starting Price", "$${"%.2f".format(it)}")
+                    }
+
+                    event.ageRestriction?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Age Restriction", it)
+                    }
+
+                    event.isWheelchairAccessible?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow(
+                            "Wheelchair Accessible",
+                            if (it) "Yes" else "No"
+                        )
+                    }
+
+                    event.isOutdoor?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow(
+                            "Event Type",
+                            if (it) "Outdoor" else "Indoor"
+                        )
+                    }
+
+                    event.refundPolicy?.let {
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow("Refund Policy", it)
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
+
     }
 }
+
+@Composable
+fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Label
+        Text(
+            text = label,
+            color = Color.Gray,
+            fontSize = 14.sp,
+            modifier = Modifier.width(140.dp) // fixed label width
+        )
+
+        // Value (wraps naturally, left-aligned)
+        Text(
+            text = value,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Start
+        )
+    }
+}
+
+
+
 
 /**
  * Utility to format Firebase Timestamp into readable date string
  */
+//fun formatDate(ts: com.google.firebase.Timestamp?): String {
+//    if (ts == null) return "Date TBA"
+//    return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
+//        .format(ts.toDate())
+//}
+
 fun formatDate(ts: com.google.firebase.Timestamp?): String {
     if (ts == null) return "Date TBA"
-    return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
-        .format(ts.toDate())
+
+    val formatter = SimpleDateFormat(
+        "EEE, MMM dd yyyy h:mm a",
+        Locale.getDefault()
+    )
+
+    formatter.timeZone = TimeZone.getTimeZone("Asia/Singapore")
+
+    return formatter.format(ts.toDate())
 }

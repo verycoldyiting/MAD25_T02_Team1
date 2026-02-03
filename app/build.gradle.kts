@@ -29,6 +29,7 @@ android {
         buildConfig = true
     }
 
+
     defaultConfig {
         applicationId = "sg.edu.np.mad.mad25_t02_team1"
         minSdk = 24
@@ -110,6 +111,15 @@ dependencies {
     implementation("com.google.zxing:core:3.5.2")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.smart.reply.common)
+
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite-android:1.3.0")
+
+
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+
+
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

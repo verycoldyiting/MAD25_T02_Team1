@@ -1,10 +1,10 @@
 package sg.edu.np.mad.mad25_t02_team1
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
@@ -30,52 +30,72 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import sg.edu.np.mad.mad25_t02_team1.auth.BiometricAuthHelper
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
 
-class LoginScreen : ComponentActivity() {
+class LoginScreen : FragmentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // This allows content to go behind the status bar
-        enableEdgeToEdge()
+        val auth = FirebaseAuth.getInstance()
 
+        // ✅ Read biometric preference (default = enabled)
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val biometricEnabled = prefs.getBoolean("biometric_enabled", true)
+
+        // ✅ Biometric gate (ONLY if user logged in AND enabled)
+        if (auth.currentUser != null && biometricEnabled) {
+            val biometricHelper = BiometricAuthHelper(this)
+
+            if (biometricHelper.isBiometricAvailable()) {
+                biometricHelper.authenticate(
+                    onSuccess = {
+                        startActivity(Intent(this, HomePage::class.java))
+                        finish()
+                    },
+                    onError = {
+                        Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+                    }
+                )
+                return
+            }
+        }
+
+        // ✅ Normal email/password login UI
+        enableEdgeToEdge()
         setContent {
             MAD25_T02_Team1Theme {
-                // Following your ProfileScreen reference:
-                // We remove the Scaffold and apply fillMaxSize directly to the content.
-                LoginContent(modifier = Modifier.fillMaxSize())
+                LoginContent()
             }
         }
     }
 }
 
 @Composable
-fun LoginContent(modifier: Modifier = Modifier) {
-    // State variables to hold user input
-    var email by remember { mutableStateOf("") } // Stores email input
-    var password by remember { mutableStateOf("") } // Stores password input
-    var passwordVisible by remember { mutableStateOf(false) } // Controls password visibility toggle
+fun LoginContent() {
+
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-
-    // Initialize Firebase services
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
-    // Main container column with scrolling support
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()), // Enable vertical scrolling for small screens
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         TicketLahHeader()
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(Modifier.height(40.dp))
 
         Column(
             modifier = Modifier
@@ -90,126 +110,112 @@ fun LoginContent(modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Please Login",
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.Gray
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // EMAIL INPUT FIELD
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Email, null) },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true // Prevent multiline input
+                singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // PASSWORD INPUT FIELD
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }, // Lock icon on left
+                leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
-                    // Toggle button to show/hide password
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = "Toggle password visibility"
+                            imageVector =
+                                if (passwordVisible) Icons.Default.Visibility
+                                else Icons.Default.VisibilityOff,
+                            contentDescription = null
                         )
                     }
                 },
-                // Show password as dots or plain text based on passwordVisible state
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                visualTransformation =
+                    if (passwordVisible) VisualTransformation.None
+                    else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true // Prevent multiline input
+                singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Forgot password
             TextButton(
                 onClick = {
-                    // Navigate to ForgotPasswordActivity when clicked
-                    val intent = Intent(context, ForgotPasswordActivity::class.java)
-                    context.startActivity(intent)
+                    context.startActivity(
+                        Intent(context, ForgotPasswordActivity::class.java)
+                    )
                 },
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text(
                     "Forgot Password?",
-                    color = Color.Black,
-                    fontSize = 14.sp,
                     style = TextStyle(textDecoration = TextDecoration.Underline)
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Login Button
             Button(
                 onClick = {
-                    // VALIDATION: Check if fields are empty
                     if (email.isBlank() || password.isBlank()) {
-                        Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                        return@Button // Exit if validation fails
+                        Toast.makeText(
+                            context,
+                            "Please fill in all fields",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@Button
                     }
 
-                    //  Authenticate with Firebase Authentication
                     auth.signInWithEmailAndPassword(email, password)
-                        .addOnSuccessListener { authResult ->
-                            // Get user ID from authentication result
-                            val uid = authResult.user?.uid
+                        .addOnSuccessListener { result ->
+                            val uid = result.user?.uid ?: return@addOnSuccessListener
 
-                            // Check if UID exists
-                            if (uid == null) {
-                                Toast.makeText(context, "User not found. Please register.", Toast.LENGTH_SHORT).show()
-                                return@addOnSuccessListener
-                            }
-
-                            // Verify user exists in Firestore database
                             db.collection("Account")
-                                .whereEqualTo("uid", uid) // Query by user ID
+                                .whereEqualTo("uid", uid)
                                 .get()
                                 .addOnSuccessListener { snap ->
-                                    // Check if user document exists in Firestore
                                     if (snap.isEmpty) {
-                                        // User authenticated but no account in database
-                                        Toast.makeText(context, "User not found. Please register.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "User not found",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     } else {
-                                        // Login successful - navigate to home page
-                                        Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
-                                        val intent = Intent(context, HomePage::class.java)
-                                        // Clear back stack so user can't go back to login
-                                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                        val intent =
+                                            Intent(context, HomePage::class.java)
+                                        intent.flags =
+                                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                    Intent.FLAG_ACTIVITY_CLEAR_TASK
                                         context.startActivity(intent)
-                                        (context as? Activity)?.finish() // Close login activity
+                                        (context as? Activity)?.finish()
                                     }
-                                }
-                                .addOnFailureListener {
-                                    // Handle Firestore query error
-                                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                         }
                         .addOnFailureListener {
-                            // Handle authentication error (wrong password, user not found, etc.)
-                            Toast.makeText(context, "Login Failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                it.message ?: "Login failed",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-
-                // ... inside Login Button ...
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFF2B705), // Changed from Color.Yellow to Golden Yellow
+                    containerColor = Color(0xFFF2B705),
                     contentColor = Color.Black
                 ),
                 border = BorderStroke(1.dp, Color.Black),
@@ -222,40 +228,34 @@ fun LoginContent(modifier: Modifier = Modifier) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Register
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
                 Text(
                     text = "Don't have an account? ",
-                    fontSize = 14.sp,
                     color = Color.Gray
                 )
 
                 TextButton(
                     onClick = {
-                        // Navigate to RegisterPage when clicked
-                        val intent = Intent(context, RegisterPage::class.java)
-                        context.startActivity(intent)
+                        context.startActivity(
+                            Intent(context, RegisterPage::class.java)
+                        )
                     },
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(0.dp), // key fix
+                    modifier = Modifier.height(18.dp)     // optional: tighter alignment
                 ) {
                     Text(
                         text = "Register",
-                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black,
                         style = TextStyle(textDecoration = TextDecoration.Underline)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

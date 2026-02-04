@@ -3,7 +3,6 @@ package sg.edu.np.mad.mad25_t02_team1
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.provider.CalendarContract
 import android.util.Log
 import android.widget.Toast
@@ -27,11 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,8 +44,6 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.auth.FirebaseAuth
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -261,12 +256,15 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Event, "Event Date", Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = "Event Date",
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = timestampToString(eventDate),
@@ -287,18 +285,17 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                                 interactionSource = remember { MutableInteractionSource() }
                             ) {
                                 event?.let { evt ->
-                                    // check if calendar permissions already granted
-                                    val hasCalendarPermission = ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.WRITE_CALENDAR
-                                    ) == PackageManager.PERMISSION_GRANTED &&
-                                            ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.READ_CALENDAR
-                                            ) == PackageManager.PERMISSION_GRANTED
+                                    val hasCalendarPermission =
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.WRITE_CALENDAR
+                                        ) == PackageManager.PERMISSION_GRANTED &&
+                                                ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.READ_CALENDAR
+                                                ) == PackageManager.PERMISSION_GRANTED
 
                                     if (hasCalendarPermission) {
-                                        // add to calendar directly
                                         isPressed = true
                                         addEventToCalendarDirectly(context, evt)
                                         coroutineScope.launch {
@@ -306,7 +303,6 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                                             isPressed = false
                                         }
                                     } else {
-                                        // request permissions first
                                         pendingEvent = evt
                                         permissionLauncher.launch(
                                             arrayOf(
@@ -329,6 +325,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                     }
                 }
             }
+
 
             event?.venue?.takeIf { it.isNotEmpty() }?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -520,10 +517,11 @@ fun EventImage(rawUrl: String?) {
 
 // convert firebase timestamp to readable date string
 fun timestampToString(ts: Timestamp): String {
-    // format: "12 jan 2025, 12:00 pm"
-    val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
-    return sdf.format(ts.toDate())
+    return SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Singapore")
+    }.format(ts.toDate())
 }
+
 
 // add event directly to phone's calendar database
 private fun addEventToCalendarDirectly(context: android.content.Context, event: Event) {

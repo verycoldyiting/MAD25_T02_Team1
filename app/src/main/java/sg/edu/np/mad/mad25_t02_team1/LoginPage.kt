@@ -65,7 +65,6 @@ class LoginScreen : FragmentActivity() {
             }
         }
 
-        //
         // Normal email/password login UI
         enableEdgeToEdge()
         setContent {
@@ -246,8 +245,8 @@ fun LoginContent() {
                             Intent(context, RegisterPage::class.java)
                         )
                     },
-                    contentPadding = PaddingValues(0.dp), // key fix
-                    modifier = Modifier.height(18.dp)     // optional: tighter alignment
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.height(18.dp)
                 ) {
                     Text(
                         text = "Register",

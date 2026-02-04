@@ -42,7 +42,8 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.navigation.compose.currentBackStackEntryAsState
-
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.ActivityResult
 
 
 
@@ -431,6 +432,9 @@ fun handleSpeechNavigation(
             navController.navigate(BottomNavItem.Profile.route)
         }
         text.contains("chatbot") || text.contains("chat") -> {
+            navController.navigate(AppRoute.Chatbot.route)
+        }
+        text.contains("help") || text.contains("assistance") -> {
             navController.navigate(AppRoute.Chatbot.route)
         }
         else -> {

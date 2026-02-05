@@ -209,7 +209,7 @@ Google AI Studio
 * Ensures the app is responsive and adapts well across various screen sizes and orientations.
 ## Logo Implementation [Valerie]
 
-# Stage 2 Implemented features:
+# Stage 2 Implemented features/enhancements:
 Natalie -
 1. Profile picture upload, password update and validation, and forget password
 * Uploading of profile picture and editing of email and password which once saved will be updated to FireStore and FireBase Authentication

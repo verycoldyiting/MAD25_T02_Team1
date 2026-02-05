@@ -209,8 +209,7 @@ Google AI Studio
 * Ensures the app is responsive and adapts well across various screen sizes and orientations.
 ## Logo Implementation [Valerie]
 
-# Planned task(s) and feature(s) allocation of each member in the team for Stage 2.
-# Stage 2 Implementation:
+# Stage 2 Implemented features:
 Natalie -
 1. Profile picture upload, password update and validation, and forget password
 * Uploading of profile picture and editing of email and password which once saved will be updated to FireStore and FireBase Authentication
@@ -226,7 +225,7 @@ Valerie -
 * Allows message sending, voice input, and data retrieval with smart replies. It detects and translates languages, matches messages with artist info and events, responds to greetings, uses Levenshtein distance for keyword matching, provides smart replies, shows translated prompts, and cleans messages.
 
 2. Third party payment integration
-*Stripe handles all payment processing, including card validation and transaction security, ensuring that sensitive payment details are never stored on the device or application server. This provides a reliable and industry-standard payment experience for users.
+* Stripe handles all payment processing, including card validation and transaction security, ensuring that sensitive payment details are never stored on the device or application server. This provides a reliable and industry-standard payment experience for users.
 
 Yuhong -
 1. Google Maps and Places API

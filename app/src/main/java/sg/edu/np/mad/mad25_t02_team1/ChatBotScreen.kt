@@ -144,7 +144,6 @@ object LevenshteinUtils {
 
 class TranslationHelper {
     private val apiKey = BuildConfig.MY_API_KEY
-
     suspend fun detectLanguage(text: String): String = withContext(Dispatchers.IO) {
         try {
             Log.d("API_KEY_CHECK", "Key length=${apiKey.length}")

@@ -225,13 +225,19 @@ Valerie -
 1. Chatbot
 * Allows message sending, voice input, and data retrieval with smart replies. It detects and translates languages, matches messages with artist info and events, responds to greetings, uses Levenshtein distance for keyword matching, provides smart replies, shows translated prompts, and cleans messages.
 
+2. Third party payment integration
+*Stripe handles all payment processing, including card validation and transaction security, ensuring that sensitive payment details are never stored on the device or application server. This provides a reliable and industry-standard payment experience for users.
+
 Yuhong -
 1. Google Maps and Places API
 * Displays Google Maps fragment and map pin of venue. Opens Google Maps application for navigation. Displays venue details and nearby places with Places API.
 
 Daphne -
 1. Biometric Login
-* Account information is checked through Firebase Authentication. Includes forget password
+* Able to login via fingerprint. Have a button in the profile page where users can opt to enable or disable biometric login. Login will be based on the last login session. Authentication is handled using Android’s biometric framework, which ensures that sensitive biometric data is never stored within the application itself
   
-2. Auto Fill payment page
-* Enables users to instantly populate their card information using fingerprint authentication, removing the need to manually type payment details.
+2. Speech Navigation
+* Allow users to navigate between pages using simple commands like "home", "tickets", "assistance", "search". Speech input is processed by Android’s built-in speech recognition service, and recognised keywords are mapped to existing navigation routes.
+
+3. Smart search
+* Instead of requiring users to type full event names, the search function supports flexible input such as shortened terms (e.g. “bp”) and incomplete words. This is achieved through text normalisation and initials-based matching, which improves usability while keeping the search logic generic and scalable.

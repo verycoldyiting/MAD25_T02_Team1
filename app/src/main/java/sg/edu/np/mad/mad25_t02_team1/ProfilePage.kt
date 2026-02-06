@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import android.content.Context
+import androidx.compose.ui.unit.sp
 
 
 @Composable
@@ -38,6 +40,15 @@ fun ProfileScreen() {
     val email = user.email ?: ""
 
     val context = LocalContext.current
+
+    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    var biometricEnabled by remember {
+        mutableStateOf(
+            prefs.getBoolean("biometric_enabled", true)
+        )
+    }
+
 
     // auto refresh with real-time updates
     LaunchedEffect(user.uid) {
@@ -108,6 +119,61 @@ fun ProfileScreen() {
 
         Spacer(Modifier.height(35.dp))
 
+        // Biometric login toggle
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(30.dp),
+            color = Color(0xFFF2B705),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 15.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+
+                Column {
+                    Text(
+                        text = "Biometric login",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        lineHeight = 16.sp,
+                        color = Color.Black
+                    )
+
+                    Text(
+                        text = if (biometricEnabled) "Enabled" else "Disabled",
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        color = Color.Black.copy(alpha = 0.7f)
+                    )
+                }
+
+
+                Switch(
+                    checked = biometricEnabled,
+                    onCheckedChange = { enabled ->
+                        biometricEnabled = enabled
+                        prefs.edit()
+                            .putBoolean("biometric_enabled", enabled)
+                            .apply()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.Black,
+                        uncheckedThumbColor = Color.DarkGray,
+                        checkedTrackColor = Color.Black.copy(alpha = 0.4f),
+                        uncheckedTrackColor = Color.Black.copy(alpha = 0.2f)
+                    )
+                )
+            }
+        }
+
+
+        Spacer(Modifier.height(12.dp))
+
         // Edit Profile Button
         Button(
             onClick = {
@@ -118,11 +184,9 @@ fun ProfileScreen() {
                 containerColor = Color(0xFFF2B705),
                 contentColor = Color.Black
             ),
-            border = BorderStroke(1.dp, Color.Black),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(30.dp),
             modifier = Modifier
-                .width(160.dp)
-                .height(48.dp)
+                .fillMaxWidth()
         ) {
             Text("Edit Profile", fontWeight = FontWeight.Medium)
         }
@@ -144,11 +208,9 @@ fun ProfileScreen() {
                 containerColor = Color(0xFFF2B705),
                 contentColor = Color.Black
             ),
-            border = BorderStroke(1.dp, Color.Black),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(30.dp),
             modifier = Modifier
-                .width(160.dp)
-                .height(48.dp)
+                .fillMaxWidth()
         ) {
             Text("Logout", fontWeight = FontWeight.Medium)
         }

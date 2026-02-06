@@ -1,16 +1,24 @@
 package sg.edu.np.mad.mad25_t02_team1
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.speech.RecognizerIntent
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -33,6 +41,11 @@ import androidx.compose.ui.res.painterResource
 import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.ActivityResult
+
+
 
 class HomePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,14 +58,46 @@ class HomePage : ComponentActivity() {
     }
 }
 
+sealed class AppRoute(val route: String) {
+    object Chatbot : AppRoute("chatbot")
+}
+
+
+// SCAFFOLD WITH BOTTOM BAR
 @Composable
 fun HomePageScaffold() {
     // initialise nav controller to manage app navigation state
     val navController = rememberNavController()
+    val context = LocalContext.current
+
+    val speechLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val spokenText =
+                    result.data
+                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                        ?.get(0)
+                        ?.lowercase()
+
+                spokenText?.let {
+                    handleSpeechNavigation(it, navController, context)
+                }
+            }
+        }
+
     var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
 
     Scaffold(
-        topBar = { TicketLahHeader() },
+        topBar = {
+            if (currentRoute != AppRoute.Chatbot.route) {
+                TicketLahHeader()
+            }
+        },
         bottomBar = {
             BottomNavigationBar(
                 selectedItem = selectedTab,
@@ -68,8 +113,52 @@ fun HomePageScaffold() {
                     }
                 }
             )
-        }
-    ) { innerPadding ->
+        },
+        floatingActionButton = {
+            if (currentRoute != AppRoute.Chatbot.route) {
+
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+
+                    //Speech FAB
+                    FloatingActionButton(
+                        onClick = {
+                            startSpeech(speechLauncher)
+                        },
+                        containerColor = Color.White,
+                        elevation = FloatingActionButtonDefaults.elevation(8.dp),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Speech Navigation",
+                            tint = Color.Black
+                        )
+                    }
+
+                    //Chatbot fab
+                    FloatingActionButton(
+                        onClick = {
+                            navController.navigate(AppRoute.Chatbot.route)
+                        },
+                        containerColor = Color.White,
+                        elevation = FloatingActionButtonDefaults.elevation(8.dp),
+                        shape = CircleShape
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_chatbot),
+                            contentDescription = "Chatbot",
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
+    )
+    { innerPadding ->
 
         NavHost(
             navController = navController,
@@ -80,12 +169,17 @@ fun HomePageScaffold() {
             composable(BottomNavItem.Search.route) { ExploreEventsApp() }
             composable(BottomNavItem.Tickets.route) { BookingHistoryScreen() }
             composable(BottomNavItem.Profile.route) { ProfileScreen() }
+            composable(AppRoute.Chatbot.route) {
+                ChatbotScreen(navController)
+            }
         }
     }
 }
 
+// PAGE CONTENT
 @Composable
 fun HomePageContent() {
+
     var upcomingEvents by remember { mutableStateOf(listOf<Event>()) }
     var availableEvents by remember { mutableStateOf(listOf<Event>()) }
     val context = LocalContext.current
@@ -94,17 +188,19 @@ fun HomePageContent() {
         val listener = FirebaseFirestore.getInstance()
             .collection("Events")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-
+                if (error != null) {
+                    return@addSnapshotListener
+                }
                 if (snapshot != null) {
 
                     val allEvents = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Event::class.java)
                     }
 
-                    // sorts events by date and partitioning into 'Upcoming' vs 'All'
+                    // Sort by date field from new model
                     val sorted = allEvents.sortedBy { it.date }
-                    upcomingEvents = sorted.take(3) // get top 3 for the horizontal row
+
+                    upcomingEvents = sorted.take(3)
                     availableEvents = sorted
                 }
             }
@@ -174,6 +270,7 @@ fun HomePageContent() {
     }
 }
 
+// UPCOMING EVENT CARD
 @Composable
 fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
     var imageUrl by remember { mutableStateOf<String?>(null) }
@@ -194,6 +291,7 @@ fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
         } else {
             gsUrl
         }
+
         isLoading = false
     }
 
@@ -206,7 +304,9 @@ fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
+
         Column {
+
             Box(
                 modifier = Modifier
                     .height(150.dp)
@@ -216,8 +316,8 @@ fun UpcomingEventCard(event: Event, onClick: () -> Unit) {
 
                 if (isLoading) {
                     CircularProgressIndicator()
-                } else if (!imageUrl.isNullOrEmpty()) {
 
+                } else if (!imageUrl.isNullOrEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(imageUrl)
@@ -311,4 +411,52 @@ fun AvailableEventCard(event: Event, onClick: () -> Unit) {
             )
         }
     }
+}
+
+fun handleSpeechNavigation(
+    text: String,
+    navController: androidx.navigation.NavController,
+    context: android.content.Context
+) {
+    when {
+        text.contains("home") -> {
+            navController.navigate(BottomNavItem.Home.route)
+        }
+        text.contains("search") || text.contains("explore") -> {
+            navController.navigate(BottomNavItem.Search.route)
+        }
+        text.contains("ticket") -> {
+            navController.navigate(BottomNavItem.Tickets.route)
+        }
+        text.contains("profile") -> {
+            navController.navigate(BottomNavItem.Profile.route)
+        }
+        text.contains("chatbot") || text.contains("chat") -> {
+            navController.navigate(AppRoute.Chatbot.route)
+        }
+        text.contains("help") || text.contains("assistance") -> {
+            navController.navigate(AppRoute.Chatbot.route)
+        }
+        else -> {
+            Toast.makeText(
+                context,
+                "Sorry, I didn't understand",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+}
+
+fun startSpeech(
+    launcher: androidx.activity.result.ActivityResultLauncher<Intent>
+) {
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(
+            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+        )
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now")
+    }
+    launcher.launch(intent)
 }

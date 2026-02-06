@@ -447,7 +447,7 @@ fun handleSpeechNavigation(
         text.contains("ticket") -> go(BottomNavItem.Tickets)
         text.contains("profile") -> go(BottomNavItem.Profile)
         text.contains("chatbot") || text.contains("chat") || text.contains("help") || text.contains("assistance") -> {
-            // chatbot is NOT a bottom tab, so don't change selectedTab
+
             navController.navigate(AppRoute.Chatbot.route) {
                 launchSingleTop = true
             }

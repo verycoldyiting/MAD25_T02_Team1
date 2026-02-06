@@ -42,16 +42,13 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.ActivityResult
+
 
 
 
 class HomePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val startRoute = intent.getStringExtra("startRoute")
 
         setContent {
             MAD25_T02_Team1Theme {

@@ -3,7 +3,6 @@ package sg.edu.np.mad.mad25_t02_team1
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -33,7 +32,9 @@ import com.stripe.android.paymentsheet.PaymentSheetResult
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.ui.theme.MAD25_T02_Team1Theme
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Currency
 import java.util.Date
 import java.util.Locale
 import kotlin.random.Random
@@ -88,7 +89,9 @@ class PaymentPage : ComponentActivity() {
 
                             paymentSheet.presentWithPaymentIntent(
                                 clientSecret,
-                                PaymentSheet.Configuration(merchantDisplayName = "TicketLah")
+                                PaymentSheet.Configuration(
+                                    merchantDisplayName = "TicketLah"
+                                )
                             )
                         }
                     )
@@ -121,6 +124,7 @@ fun PaymentScreen(
     val functions = remember { FirebaseFunctions.getInstance(FUNCTIONS_REGION) }
 
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var uid by remember { mutableStateOf(auth.currentUser?.uid) }
     DisposableEffect(Unit) {
@@ -135,9 +139,24 @@ fun PaymentScreen(
     var accountError by remember { mutableStateOf<String?>(null) }
     var accountLoading by remember { mutableStateOf(true) }
 
-    var paymentError by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
+
+    // Promo
+    var promoInput by remember { mutableStateOf("") }
+    var appliedPromo by remember { mutableStateOf<String?>(null) }
+    var discountAmount by remember { mutableStateOf(0.0) }
+    var promoError by remember { mutableStateOf<String?>(null) }
+
+    val subtotal = quantity * pricePerTicket
+    val bookingFee = if (subtotal == 0.0) 0.0 else 3.5
+    val finalTotal = (subtotal + bookingFee - discountAmount).coerceAtLeast(0.0)
+
+    val dateText = if (dateMillis == 0L) {
+        "Date TBA"
+    } else {
+        SimpleDateFormat("EEE, dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(dateMillis))
+    }
 
     val initialInputError = remember(eventId, quantity, pricePerTicket) {
         when {
@@ -147,7 +166,6 @@ fun PaymentScreen(
             else -> null
         }
     }
-
 
     LaunchedEffect(uid) {
         accountLoading = true
@@ -180,34 +198,10 @@ fun PaymentScreen(
         }
     }
 
-    // Billing address
-    var billingName by remember { mutableStateOf("") }
-    var addressLine1 by remember { mutableStateOf("") }
-    var postalCode by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var country by remember { mutableStateOf("Singapore") }
-
-    // Promo
-    var promoInput by remember { mutableStateOf("") }
-    var appliedPromo by remember { mutableStateOf<String?>(null) }
-    var discountAmount by remember { mutableStateOf(0.0) }
-    var promoError by remember { mutableStateOf<String?>(null) }
-
-    val subtotal = quantity * pricePerTicket
-    val bookingFee = if (subtotal == 0.0) 0.0 else 3.5
-    val finalTotal = (subtotal + bookingFee - discountAmount).coerceAtLeast(0.0)
-
-    val dateText = if (dateMillis == 0L) {
-        "Date TBA"
-    } else {
-        SimpleDateFormat("EEE, dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(dateMillis))
-    }
-
     suspend fun fetchClientSecret(amountCents: Int, bookingId: String): String {
-        val user = auth.currentUser ?: throw Exception(
-            "Login required (FirebaseAuth currentUser is null)."
-        )
+        val user = auth.currentUser ?: throw Exception("Login required (FirebaseAuth currentUser is null).")
 
+        // Refresh token
         user.getIdToken(true).await()
 
         val data = hashMapOf(
@@ -237,7 +231,13 @@ fun PaymentScreen(
         }
     }
 
+    val canCheckout = initialInputError == null &&
+            !accountLoading &&
+            accountError == null &&
+            !accountDocId.isNullOrBlank()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Box(
                 modifier = Modifier
@@ -257,8 +257,121 @@ fun PaymentScreen(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.White,
-                        modifier = Modifier.padding(6.dp).size(24.dp)
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .size(24.dp)
                     )
+                }
+            }
+        },
+        bottomBar = {
+            if (canCheckout) {
+                Surface(tonalElevation = 3.dp) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Total", color = Color.Gray, fontSize = 12.sp)
+                            Text(
+                                formatSgd(finalTotal),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                "Secure checkout powered by Stripe",
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        isProcessing = true
+
+                                        val accDocId = accountDocId!!
+                                        val bookingId = generateBookingId()
+                                        val amountCents = (finalTotal * 100).toInt().coerceAtLeast(50)
+                                        val clientSecret = fetchClientSecret(amountCents, bookingId)
+
+                                        isProcessing = false
+
+                                        startStripePayment(
+                                            clientSecret,
+                                            {
+                                                scope.launch {
+                                                    try {
+                                                        isProcessing = true
+
+                                                        val payerName =
+                                                            auth.currentUser?.displayName
+                                                                ?: auth.currentUser?.email?.substringBefore("@")
+                                                                ?: "User"
+
+                                                        val eventTime = if (dateMillis == 0L) {
+                                                            Timestamp.now()
+                                                        } else {
+                                                            Timestamp(Date(dateMillis))
+                                                        }
+
+                                                        val bookingData = hashMapOf(
+                                                            "AccID" to db.document("Account/$accDocId"),
+                                                            "Category" to category,
+                                                            "ConcertTitle" to title,
+                                                            "EventID" to eventId,
+                                                            "EventTime" to eventTime,
+                                                            "Name" to payerName,
+                                                            "PaymentMethod" to "Stripe",
+                                                            "PurchaseTime" to Timestamp.now(),
+                                                            "Quantity" to quantity,
+                                                            "Section" to section,
+                                                            "TotalPrice" to finalTotal,
+                                                            "PaymentStatus" to "Paid"
+                                                        )
+
+                                                        db.collection("BookingDetails")
+                                                            .document(bookingId)
+                                                            .set(bookingData)
+                                                            .await()
+
+                                                        isProcessing = false
+                                                        showSuccessDialog = true
+                                                    } catch (e: Exception) {
+                                                        isProcessing = false
+                                                        snackbarHostState.showSnackbar(
+                                                            "Paid but failed to save booking: ${e.message ?: "Unknown error"}"
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            { msg ->
+                                                isProcessing = false
+                                                scope.launch { snackbarHostState.showSnackbar(msg) }
+                                            }
+                                        )
+
+                                    } catch (e: Exception) {
+                                        isProcessing = false
+                                        snackbarHostState.showSnackbar(e.message ?: "Failed to start payment.")
+                                    }
+                                }
+                            },
+                            enabled = !isProcessing && finalTotal > 0,
+                            modifier = Modifier.height(52.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFFD300),
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(if (isProcessing) "Processing..." else "Pay with Stripe", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
         }
@@ -273,7 +386,9 @@ fun PaymentScreen(
             when {
                 initialInputError != null -> {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -291,7 +406,9 @@ fun PaymentScreen(
 
                 accountError != null || accountDocId.isNullOrBlank() -> {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -309,9 +426,14 @@ fun PaymentScreen(
                     Column(
                         modifier = Modifier
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp)
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 16.dp)
+                            .padding(bottom = 96.dp)
                     ) {
-                        Text("Payment", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                        Text(
+                            "Payment",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
                         Spacer(Modifier.height(8.dp))
 
                         EventSummaryCard(
@@ -341,6 +463,7 @@ fun PaymentScreen(
                                     appliedPromo = promoInput.trim().uppercase()
                                     discountAmount = result
                                     promoError = null
+                                    scope.launch { snackbarHostState.showSnackbar("Promo applied!") }
                                 } else {
                                     appliedPromo = null
                                     discountAmount = 0.0
@@ -349,106 +472,13 @@ fun PaymentScreen(
                             }
                         )
 
-                        Spacer(Modifier.height(12.dp))
-
-                        BillingAddressSection(
-                            billingName, { billingName = it },
-                            addressLine1, { addressLine1 = it },
-                            postalCode, { postalCode = it },
-                            city, { city = it },
-                            country, { country = it }
-                        )
-
-                        Spacer(Modifier.height(24.dp))
-
-                        if (paymentError != null) {
-                            Text(paymentError ?: "", color = Color(0xFFDC2626), fontSize = 13.sp)
-                            Spacer(Modifier.height(8.dp))
-                        }
+                        Spacer(Modifier.height(16.dp))
 
                         if (isProcessing) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Spacer(Modifier.height(8.dp))
                         }
 
-                        PrimaryGradientButton(
-                            text = "Pay with Stripe • \$${String.format("%.2f", finalTotal)}",
-                            enabled = !isProcessing
-                        ) {
-                            scope.launch {
-                                try {
-                                    paymentError = null
-                                    isProcessing = true
-
-                                    if (billingName.isBlank() || addressLine1.isBlank() || postalCode.isBlank()) {
-                                        isProcessing = false
-                                        Toast.makeText(context, "Billing address required", Toast.LENGTH_SHORT).show()
-                                        return@launch
-                                    }
-
-                                    val accDocId = accountDocId!!
-                                    val bookingId = generateBookingId()
-                                    val amountCents = (finalTotal * 100).toInt().coerceAtLeast(50)
-
-                                    val clientSecret = fetchClientSecret(amountCents, bookingId)
-
-                                    isProcessing = false
-
-
-                                    startStripePayment(
-                                        clientSecret,
-                                        {
-                                            scope.launch {
-                                                try {
-                                                    isProcessing = true
-
-                                                    val eventTime = if (dateMillis == 0L) {
-                                                        Timestamp.now()
-                                                    } else {
-                                                        Timestamp(Date(dateMillis))
-                                                    }
-
-                                                    val bookingData = hashMapOf(
-                                                        "AccID" to db.document("Account/$accDocId"),
-                                                        "Category" to category,
-                                                        "ConcertTitle" to title,
-                                                        "EventID" to eventId,
-                                                        "EventTime" to eventTime,
-                                                        "Name" to billingName,
-                                                        "PaymentMethod" to "Stripe",
-                                                        "PurchaseTime" to Timestamp.now(),
-                                                        "Quantity" to quantity,
-                                                        "Section" to section,
-                                                        "TotalPrice" to finalTotal,
-                                                        "PaymentStatus" to "Paid"
-                                                    )
-
-                                                    db.collection("BookingDetails")
-                                                        .document(bookingId)
-                                                        .set(bookingData)
-                                                        .await()
-
-                                                    isProcessing = false
-                                                    showSuccessDialog = true
-                                                } catch (e: Exception) {
-                                                    isProcessing = false
-                                                    paymentError = "Paid but failed to save booking: ${e.message}"
-                                                }
-                                            }
-                                        },
-                                        { msg ->
-                                            paymentError = msg
-                                            isProcessing = false
-                                        }
-                                    )
-                                } catch (e: Exception) {
-                                    isProcessing = false
-                                    paymentError = e.message ?: "Failed to start payment."
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(8.dp))
                         SecondaryOutlineButton("Cancel", !isProcessing) { activity?.finish() }
                         Spacer(Modifier.height(12.dp))
                     }
@@ -460,7 +490,11 @@ fun PaymentScreen(
                                 TextButton(
                                     onClick = {
                                         showSuccessDialog = false
-                                        context.startActivity(Intent(context, BookingHistoryActivity::class.java))
+                                        val intent = Intent(context, HomePage::class.java).apply {
+                                            putExtra("startRoute", BottomNavItem.Tickets.route)
+                                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                        }
+                                        context.startActivity(intent)
                                         activity?.finish()
                                     }
                                 ) { Text("View Booking") }
@@ -484,7 +518,6 @@ fun PaymentScreen(
 }
 
 // UI Components
-
 @Composable
 private fun EventSummaryCard(
     title: String,
@@ -506,8 +539,13 @@ private fun EventSummaryCard(
             if (artist.isNotBlank()) Text(artist, color = Color.Gray)
             Text(dateText)
             Text(venue)
+
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Column {
                     Text("Category", color = Color.Gray, fontSize = 12.sp)
                     Text(category)
@@ -550,11 +588,11 @@ private fun PriceCardWithPromo(
             PriceRow("Booking Fee", bookingFee)
             if (discountAmount > 0) PriceRow("Discount", -discountAmount, highlight = true)
 
-            Divider(Modifier.padding(vertical = 4.dp))
+            Divider(Modifier.padding(vertical = 8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Total", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("\$${String.format("%.2f", finalTotal)}", fontWeight = FontWeight.Bold)
+                Text(formatSgd(finalTotal), fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -587,88 +625,8 @@ private fun PriceCardWithPromo(
 private fun PriceRow(label: String, value: Double, highlight: Boolean = false) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = if (highlight) Color.Red else Color.Gray)
-        val prefix = if (value < 0) "-$" else "$"
-        Text(prefix + String.format("%.2f", kotlin.math.abs(value)))
-    }
-}
-
-@Composable
-private fun BillingAddressSection(
-    billingName: String,
-    onBillingNameChange: (String) -> Unit,
-    addressLine1: String,
-    onAddressLine1Change: (String) -> Unit,
-    postalCode: String,
-    onPostalCodeChange: (String) -> Unit,
-    city: String,
-    onCityChange: (String) -> Unit,
-    country: String,
-    onCountryChange: (String) -> Unit
-) {
-    Card(
-        colors = CardDefaults.cardColors(Color.White),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Billing address", fontWeight = FontWeight.SemiBold)
-
-            OutlinedTextField(
-                value = billingName,
-                onValueChange = onBillingNameChange,
-                label = { Text("Full name") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = addressLine1,
-                onValueChange = onAddressLine1Change,
-                label = { Text("Address") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = postalCode,
-                    onValueChange = {
-                        if (it.length <= 6) onPostalCodeChange(it.filter { c -> c.isDigit() })
-                    },
-                    label = { Text("Postal code") },
-                    modifier = Modifier.weight(1f)
-                )
-
-                OutlinedTextField(
-                    value = city,
-                    onValueChange = onCityChange,
-                    label = { Text("City") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            OutlinedTextField(
-                value = country,
-                onValueChange = onCountryChange,
-                label = { Text("Country") },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-@Composable
-private fun PrimaryGradientButton(text: String, enabled: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFFFFD300),
-            contentColor = Color.Black
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Text(text, fontWeight = FontWeight.SemiBold)
+        val prefix = if (value < 0) "- " else ""
+        Text(prefix + formatSgd(kotlin.math.abs(value)))
     }
 }
 
@@ -677,7 +635,9 @@ private fun SecondaryOutlineButton(text: String, enabled: Boolean, onClick: () -
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Color.White),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -700,4 +660,10 @@ private fun evaluatePromoCode(code: String, subtotal: Double): Double {
         "STUDENT5" -> 5.0
         else -> 0.0
     }
+}
+
+private fun formatSgd(amount: Double): String {
+    val nf = NumberFormat.getCurrencyInstance(Locale("en", "SG"))
+    nf.currency = Currency.getInstance("SGD")
+    return nf.format(amount)
 }

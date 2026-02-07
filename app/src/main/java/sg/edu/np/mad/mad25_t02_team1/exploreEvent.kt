@@ -48,40 +48,58 @@ fun ExploreEventsApp() {
         try {
             val db = FirebaseFirestore.getInstance()
             val result = db.collection("Events").get().await()
+
             val fetchedEvents = result.documents.mapNotNull { document ->
                 document.toObject(Event::class.java)?.copy(
-                    id = document.id // e
-                // ensure the ID is captured from the document metadata
+                    id = document.id // ensure ID captured
                 )
             }
+
             allEvents = fetchedEvents
 
-            // extracts unique genres for the filter dropdown
+            // extracts unique genres for the filter dropdown (from all events)
             availableGenres = fetchedEvents.mapNotNull { it.genre }
                 .filter { it.isNotEmpty() }
                 .distinct()
                 .sorted()
+
         } catch (e: Exception) {
             Log.e("ExploreEvent", "Error loading event data", e)
         }
     }
 
-    // reactive filter logic
-    // recalculates 'displayedEvents' only when search, genre, or the list changes.
+    val now = System.currentTimeMillis()
 
-    val displayedEvents = remember(searchQuery, selectedGenre, allEvents) {
-        allEvents.filter { event ->
-            // Search Requirement: Matches Artist OR Event Name
+    // Filter out past events first, then apply search + genre filters
+    val displayedEvents = remember(searchQuery, selectedGenre, allEvents, now) {
+
+        //  keep only upcoming events
+        val upcomingOnly = allEvents.filter { event ->
+            val t = event.date?.toDate()?.time ?: 0L
+            (t == 0L) || (t >= now)
+        }
+
+        // apply search + genre filters
+        val filtered = upcomingOnly.filter { event ->
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 event.artist?.contains(searchQuery, ignoreCase = true) == true ||
                         event.name?.contains(searchQuery, ignoreCase = true) == true
             }
-            // Filter Requirement: Matches selected Genre
+
             val matchesGenre = if (selectedGenre == null) true else {
                 event.genre?.equals(selectedGenre, ignoreCase = true) == true
             }
+
             matchesSearch && matchesGenre
         }
+
+        // sort by soonest first; Date TBA goes last
+        filtered.sortedWith(
+            compareBy<Event> { e ->
+                val t = e.date?.toDate()?.time ?: 0L
+                if (t == 0L) Long.MAX_VALUE else t
+            }
+        )
     }
 
     Scaffold(
@@ -105,7 +123,6 @@ fun ExploreEventsApp() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // lazy column
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
@@ -114,7 +131,6 @@ fun ExploreEventsApp() {
                     EventCard(
                         event = event,
                         onClick = {
-                            // Intent to navigate to Details page, passing the unique Event ID
                             val intent = Intent(context, EventDetailsActivity::class.java)
                             intent.putExtra("EVENT_ID", event.id)
                             context.startActivity(intent)
@@ -164,13 +180,11 @@ fun SearchBarWithFilter(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // filter Dropdown logic
         Box {
             IconButton(onClick = { showMenu = true }) {
                 Icon(
                     imageVector = Icons.Outlined.FilterAlt,
                     contentDescription = "Filter",
-                    // change colour if a filter is active
                     tint = if (selectedGenre != null) MaterialTheme.colorScheme.primary else Color.Gray
                 )
             }
@@ -180,7 +194,6 @@ fun SearchBarWithFilter(
                 onDismissRequest = { showMenu = false },
                 modifier = Modifier.background(Color.White)
             ) {
-                // reset filter
                 DropdownMenuItem(
                     text = { Text("All Genres", fontWeight = FontWeight.Bold) },
                     onClick = {
@@ -189,11 +202,14 @@ fun SearchBarWithFilter(
                     }
                 )
 
-
-                // list available genres
                 availableGenres.forEach { genre ->
                     DropdownMenuItem(
-                        text = { Text(genre, color = if (selectedGenre == genre) MaterialTheme.colorScheme.primary else Color.Black) },
+                        text = {
+                            Text(
+                                genre,
+                                color = if (selectedGenre == genre) MaterialTheme.colorScheme.primary else Color.Black
+                            )
+                        },
                         onClick = {
                             onGenreSelected(genre)
                             showMenu = false
@@ -210,7 +226,6 @@ fun EventCard(
     event: Event,
     onClick: () -> Unit
 ) {
-    // manages the final resolved image URL (handling gs:// + https://)
     var finalImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoadingImage by remember { mutableStateOf(true) }
 
@@ -218,10 +233,11 @@ fun EventCard(
         isLoadingImage = true
         val rawUrl = event.eventImage?.trim() ?: ""
         if (rawUrl.isEmpty()) {
+            finalImageUrl = null
             isLoadingImage = false
             return@LaunchedEffect
         }
-        // If URL starts with gs://, we need to fetch the actual download URL
+
         finalImageUrl = if (rawUrl.startsWith("gs://")) {
             try {
                 val ref = FirebaseStorage.getInstance().getReferenceFromUrl(rawUrl)
@@ -233,6 +249,7 @@ fun EventCard(
         } else {
             rawUrl
         }
+
         isLoadingImage = false
     }
 
@@ -253,7 +270,6 @@ fun EventCard(
                     .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
-                // loading state vs success state for image
                 if (isLoadingImage) {
                     CircularProgressIndicator()
                 } else if (finalImageUrl != null) {
@@ -289,10 +305,11 @@ fun EventCard(
                 }
             }
 
-            // event details section
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+            ) {
                 Text(
                     text = event.name.orEmpty(),
                     fontSize = 16.sp,

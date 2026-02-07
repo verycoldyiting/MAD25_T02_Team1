@@ -42,14 +42,14 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.ActivityResult
+
 
 
 
 class HomePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             MAD25_T02_Team1Theme {
                 HomePageScaffold()
@@ -58,6 +58,7 @@ class HomePage : ComponentActivity() {
     }
 }
 
+
 sealed class AppRoute(val route: String) {
     object Chatbot : AppRoute("chatbot")
 }
@@ -65,10 +66,21 @@ sealed class AppRoute(val route: String) {
 
 // SCAFFOLD WITH BOTTOM BAR
 @Composable
-fun HomePageScaffold() {
+fun HomePageScaffold(startRoute: String? = null) {
     // initialise nav controller to manage app navigation state
     val navController = rememberNavController()
     val context = LocalContext.current
+    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
+
+    LaunchedEffect(startRoute) {
+        if (!startRoute.isNullOrBlank()) {
+            navController.navigate(startRoute) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
 
     val speechLauncher =
         rememberLauncherForActivityResult(
@@ -82,12 +94,13 @@ fun HomePageScaffold() {
                         ?.lowercase()
 
                 spokenText?.let {
-                    handleSpeechNavigation(it, navController, context)
+                    handleSpeechNavigation(it, navController, context) { newTab ->
+                        selectedTab = newTab
+                    }
                 }
             }
         }
 
-    var selectedTab by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -194,15 +207,28 @@ fun HomePageContent() {
                 if (snapshot != null) {
 
                     val allEvents = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(Event::class.java)
+                        val e = doc.toObject(Event::class.java)
+                        e?.copy(id = doc.id)
                     }
 
-                    // Sort by date field from new model
-                    val sorted = allEvents.sortedBy { it.date }
+                    val now = System.currentTimeMillis()
 
-                    upcomingEvents = sorted.take(3)
-                    availableEvents = sorted
+                    // upcoming events
+                    val upcomingOnly = allEvents
+                        .filter { event ->
+                            val t = event.date?.toDate()?.time ?: 0L
+                            t == 0L || t >= now
+                        }
+
+                        .sortedBy { event ->
+                            val t = event.date?.toDate()?.time ?: 0L
+                            if (t == 0L) Long.MAX_VALUE else t
+                        }
+
+                    upcomingEvents = upcomingOnly.take(3)
+                    availableEvents = upcomingOnly
                 }
+
             }
         onDispose {
             listener.remove()
@@ -416,36 +442,35 @@ fun AvailableEventCard(event: Event, onClick: () -> Unit) {
 fun handleSpeechNavigation(
     text: String,
     navController: androidx.navigation.NavController,
-    context: android.content.Context
+    context: android.content.Context,
+    setSelectedTab: (BottomNavItem) -> Unit
 ) {
+    fun go(item: BottomNavItem) {
+        setSelectedTab(item)
+        navController.navigate(item.route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     when {
-        text.contains("home") -> {
-            navController.navigate(BottomNavItem.Home.route)
-        }
-        text.contains("search") || text.contains("explore") -> {
-            navController.navigate(BottomNavItem.Search.route)
-        }
-        text.contains("ticket") -> {
-            navController.navigate(BottomNavItem.Tickets.route)
-        }
-        text.contains("profile") -> {
-            navController.navigate(BottomNavItem.Profile.route)
-        }
-        text.contains("chatbot") || text.contains("chat") -> {
-            navController.navigate(AppRoute.Chatbot.route)
-        }
-        text.contains("help") || text.contains("assistance") -> {
-            navController.navigate(AppRoute.Chatbot.route)
+        text.contains("home") -> go(BottomNavItem.Home)
+        text.contains("search") || text.contains("explore") -> go(BottomNavItem.Search)
+        text.contains("ticket") -> go(BottomNavItem.Tickets)
+        text.contains("profile") -> go(BottomNavItem.Profile)
+        text.contains("chatbot") || text.contains("chat") || text.contains("help") || text.contains("assistance") -> {
+
+            navController.navigate(AppRoute.Chatbot.route) {
+                launchSingleTop = true
+            }
         }
         else -> {
-            Toast.makeText(
-                context,
-                "Sorry, I didn't understand",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(context, "Sorry, I didn't understand", Toast.LENGTH_SHORT).show()
         }
     }
 }
+
 
 fun startSpeech(
     launcher: androidx.activity.result.ActivityResultLauncher<Intent>

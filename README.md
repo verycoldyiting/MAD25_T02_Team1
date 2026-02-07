@@ -229,7 +229,13 @@ Valerie -
 
 Yuhong -
 1. Google Maps and Places API
-* Displays Google Maps fragment and map pin of venue. Opens Google Maps application for navigation. Displays venue details and nearby places with Places API.
+* Interactive Google Maps: Embeds a fully functional map fragment that automatically locates and pins the event venue using Geocoding.
+* Explore Nearby: Integrated with Google Places API to help users find amenities within a 500m walking radius:
+  * Food & Dining: Displays top-rated restaurants and eateries nearby (Green Pins).
+  * Transport: Locates the nearest bus stops and transit points (Blue Pins).
+* Navigation Support: Includes a "Get Directions" button that seamlessly launches the external Google Maps app with the destination pre-filled.
+* Customizable Views: Users can toggle between Normal, Satellite, and Hybrid map layers.
+
 
 Daphne -
 1. Biometric Login

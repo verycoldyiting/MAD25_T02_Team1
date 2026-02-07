@@ -1,7 +1,7 @@
 package sg.edu.np.mad.mad25_t02_team1
 
-import android.content.Intent
 import android.util.Log
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,11 +25,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
@@ -40,46 +43,61 @@ fun ExploreEventsApp() {
     var selectedGenre by remember { mutableStateOf<String?>(null) }
     var allEvents by remember { mutableStateOf<List<Event>>(emptyList()) }
     var availableGenres by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
+        isLoading = true
+        errorMessage = null
+
         try {
+            // Only Firebase operations in the try block
             val db = FirebaseFirestore.getInstance()
             val result = db.collection("Events").get().await()
 
             val fetchedEvents = result.documents.mapNotNull { document ->
-                document.toObject(Event::class.java)?.copy(
-                    id = document.id // ensure ID captured
-                )
+                try {
+                    document.toObject(Event::class.java)?.copy(id = document.id)
+                } catch (e: Exception) {
+                    // Log individual parsing errors but continue
+                    Log.w("ExploreEvent", "Failed to parse event: ${document.id}", e)
+                    null
+                }
             }
 
+            // Update state with fetched events
             allEvents = fetchedEvents
 
-            // extracts unique genres for the filter dropdown (from all events)
-            availableGenres = fetchedEvents.mapNotNull { it.genre }
+        } catch (e: FirebaseNetworkException) {
+            errorMessage = "No internet connection. Please check your network and try again."
+            Log.e("ExploreEvent", "Network error loading events", e)
+
+        } catch (e: Exception) {
+            errorMessage = "Failed to load events. Please try again later."
+            Log.e("ExploreEvent", "Error loading event data", e)
+
+        } finally {
+            // Data processing happens here - if Firebase succeeded, this always works
+            availableGenres = allEvents.mapNotNull { it.genre }
                 .filter { it.isNotEmpty() }
                 .distinct()
                 .sorted()
 
-        } catch (e: Exception) {
-            Log.e("ExploreEvent", "Error loading event data", e)
+            isLoading = false
         }
     }
 
     val now = System.currentTimeMillis()
 
-    // Filter out past events first, then apply search + genre filters
     val displayedEvents = remember(searchQuery, selectedGenre, allEvents, now) {
-
-        //  keep only upcoming events
         val upcomingOnly = allEvents.filter { event ->
             val t = event.date?.toDate()?.time ?: 0L
             (t == 0L) || (t >= now)
         }
 
-        // apply search + genre filters
         val filtered = upcomingOnly.filter { event ->
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 event.artist?.contains(searchQuery, ignoreCase = true) == true ||
@@ -93,7 +111,6 @@ fun ExploreEventsApp() {
             matchesSearch && matchesGenre
         }
 
-        // sort by soonest first; Date TBA goes last
         filtered.sortedWith(
             compareBy<Event> { e ->
                 val t = e.date?.toDate()?.time ?: 0L
@@ -111,32 +128,187 @@ fun ExploreEventsApp() {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // search bar and filter icons
-            SearchBarWithFilter(
-                query = searchQuery,
-                onQueryChange = { searchQuery = it },
-                onSearchClicked = { focusManager.clearFocus() },
-                availableGenres = availableGenres,
-                selectedGenre = selectedGenre,
-                onGenreSelected = { genre -> selectedGenre = genre }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(displayedEvents, key = { it.id }) { event ->
-                    EventCard(
-                        event = event,
-                        onClick = {
-                            val intent = Intent(context, EventDetailsActivity::class.java)
-                            intent.putExtra("EVENT_ID", event.id)
-                            context.startActivity(intent)
+            when {
+                errorMessage != null -> {
+                    ErrorView(
+                        message = errorMessage!!,
+                        onRetry = {
+                            // Trigger re-composition by changing a key
+                            errorMessage = null
                         }
                     )
                 }
+
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading events...",
+                                fontSize = 14.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    SearchBarWithFilter(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        onSearchClicked = { focusManager.clearFocus() },
+                        availableGenres = availableGenres,
+                        selectedGenre = selectedGenre,
+                        onGenreSelected = { genre -> selectedGenre = genre }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (selectedGenre != null) {
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedGenre = null },
+                            label = { Text(selectedGenre!!) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Clear filter",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${displayedEvents.size} event${if (displayedEvents.size != 1) "s" else ""} found",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (displayedEvents.isEmpty() && allEvents.isNotEmpty()) {
+                        EmptySearchResults(
+                            onClearFilters = {
+                                searchQuery = ""
+                                selectedGenre = null
+                            }
+                        )
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(displayedEvents, key = { it.id }) { event ->
+                                EventCard(
+                                    event = event,
+                                    onClick = {
+                                        val intent = Intent(context, EventDetailsActivity::class.java)
+                                        intent.putExtra("EVENT_ID", event.id)
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ErrorView(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Error",
+                tint = Color.Gray,
+                modifier = Modifier.size(64.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = message,
+                fontSize = 16.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text("Retry")
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptySearchResults(
+    onClearFilters: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "No results",
+                tint = Color.Gray,
+                modifier = Modifier.size(64.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No events found",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Try adjusting your search or filters",
+                fontSize = 14.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            TextButton(onClick = onClearFilters) {
+                Text("Clear all filters")
             }
         }
     }
@@ -157,7 +329,6 @@ fun SearchBarWithFilter(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
-
         TextField(
             value = query,
             onValueChange = onQueryChange,
@@ -192,22 +363,33 @@ fun SearchBarWithFilter(
             DropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false },
-                modifier = Modifier.background(Color.White)
+                modifier = Modifier
+                    .background(Color.White)
+                    .widthIn(min = 150.dp)
             ) {
                 DropdownMenuItem(
-                    text = { Text("All Genres", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            "All Genres",
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedGenre == null) MaterialTheme.colorScheme.primary else Color.Black
+                        )
+                    },
                     onClick = {
                         onGenreSelected(null)
                         showMenu = false
                     }
                 )
 
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
                 availableGenres.forEach { genre ->
                     DropdownMenuItem(
                         text = {
                             Text(
                                 genre,
-                                color = if (selectedGenre == genre) MaterialTheme.colorScheme.primary else Color.Black
+                                color = if (selectedGenre == genre) MaterialTheme.colorScheme.primary else Color.Black,
+                                fontWeight = if (selectedGenre == genre) FontWeight.SemiBold else FontWeight.Normal
                             )
                         },
                         onClick = {

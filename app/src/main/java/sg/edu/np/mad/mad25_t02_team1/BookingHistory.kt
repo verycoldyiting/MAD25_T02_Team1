@@ -103,7 +103,6 @@ fun BookingHistoryScreen() {
     var isLoading by remember { mutableStateOf(true) }
     val firebaseUid = FirebaseAuth.getInstance().currentUser?.uid
 
-    // 3-tab filter state
     var viewMode by remember { mutableStateOf(TicketViewMode.UPCOMING) }
 
     // fetch booking data when screen loads or user changes
@@ -448,14 +447,14 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Check if event has passed (for expired ticket detection)
+            // check if event has passed (for expired ticket detection)
             val currentTime = System.currentTimeMillis()
             val eventTime = event?.date?.toDate()?.time ?: 0L
             val isExpired = eventTime > 0 && currentTime > eventTime
 
-            // Show either "View QR Code" button OR "QR Code Expired" box
+            // show either "View QR Code" button OR "QR Code Expired" box
             if (isExpired) {
-                // EXPIRED TICKET - Show gray box (not clickable)
+                // expired ticket - show gray box (not clickable)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -485,7 +484,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                     }
                 }
             } else {
-                // ACTIVE TICKET - Show yellow button (clickable)
+                // activate ticket - show yellow button (clickable)
                 Button(
                     onClick = {
                         val intent = android.content.Intent(context, QRCodeActivity::class.java).apply {

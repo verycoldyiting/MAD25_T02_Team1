@@ -40,17 +40,19 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Booking
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import java.text.SimpleDateFormat
 import java.util.*
+
+private enum class TicketViewMode { UPCOMING, RECENT, PAST }
 
 @Composable
 fun BookingHistoryScaffold() {
@@ -93,7 +95,6 @@ fun BookingHistoryScaffold() {
     }
 }
 
-
 // main screen displaying user's booking history with qr codes
 @Composable
 fun BookingHistoryScreen() {
@@ -101,6 +102,9 @@ fun BookingHistoryScreen() {
     var bookingWithEvents by remember { mutableStateOf<List<Pair<Booking, Event?>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val firebaseUid = FirebaseAuth.getInstance().currentUser?.uid
+
+    // 3-tab filter state
+    var viewMode by remember { mutableStateOf(TicketViewMode.UPCOMING) }
 
     // fetch booking data when screen loads or user changes
     LaunchedEffect(key1 = firebaseUid) {
@@ -134,7 +138,6 @@ fun BookingHistoryScreen() {
 
             val accountRef = db.document("/Account/$resolvedCustomAccId")
 
-            // fetch all bookings belonging to this account
             val bookingSnapshot = db.collection("BookingDetails")
                 .whereEqualTo("AccID", accountRef)
                 .get()
@@ -162,13 +165,8 @@ fun BookingHistoryScreen() {
                 booking to booking.eventId?.let { eventMap[it] }
             }
 
-            // Sort by event date - latest events first (descending order)
-            val sortedPairs = eventBookingPairs.sortedByDescending { (_, event) ->
-                event?.date?.toDate()?.time ?: 0L
-            }
-
-            // update state with fetched data
-            bookingWithEvents = sortedPairs
+            // store raw list; we'll sort it based on filter mode
+            bookingWithEvents = eventBookingPairs
 
         } catch (e: Exception) {
             Log.e("BookingHistory", "Error fetching data", e)
@@ -178,18 +176,98 @@ fun BookingHistoryScreen() {
         }
     }
 
+    val now = System.currentTimeMillis()
+
+    // filter + sorting logic
+    val displayedList = remember(bookingWithEvents, viewMode, now) {
+
+        fun eventTimeMillis(event: Event?): Long {
+            return event?.date?.toDate()?.time ?: 0L
+        }
+
+        val upcoming = bookingWithEvents.filter { (_, event) ->
+            val t = eventTimeMillis(event)
+            t == 0L || t >= now
+        }
+
+        val past = bookingWithEvents.filter { (_, event) ->
+            val t = eventTimeMillis(event)
+            t in 1 until now
+        }
+
+        when (viewMode) {
+            TicketViewMode.UPCOMING ->
+                // soonest event first
+                upcoming.sortedBy { (_, event) ->
+                    val t = eventTimeMillis(event)
+                    if (t == 0L) Long.MAX_VALUE else t
+                }
+
+            TicketViewMode.RECENT ->
+                // upcoming tickets, latest purchase first
+                upcoming.sortedByDescending { (booking, _) ->
+                    booking.purchaseTime?.toDate()?.time ?: 0L
+                }
+
+            TicketViewMode.PAST ->
+                // most recent past event first
+                past.sortedByDescending { (_, event) ->
+                    eventTimeMillis(event)
+                }
+        }
+    }
+
+
     // display ui based on loading state
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+
+        //  3 filter chips row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = viewMode == TicketViewMode.UPCOMING,
+                onClick = { viewMode = TicketViewMode.UPCOMING },
+                label = { Text("Upcoming") }
+            )
+            FilterChip(
+                selected = viewMode == TicketViewMode.RECENT,
+                onClick = { viewMode = TicketViewMode.RECENT },
+                label = { Text("Recently Purchased") }
+            )
+            FilterChip(
+                selected = viewMode == TicketViewMode.PAST,
+                onClick = { viewMode = TicketViewMode.PAST },
+                label = { Text("Past") }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
         if (isLoading) {
             // show loading spinner
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else if (bookingWithEvents.isEmpty()) {
-            // show empty state message
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No booking history found.") }
+        } else if (displayedList.isEmpty()) {
+            // show empty state message depending on tab
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    when (viewMode) {
+                        TicketViewMode.UPCOMING -> "No upcoming tickets."
+                        TicketViewMode.RECENT -> "No recent purchases for upcoming events."
+                        TicketViewMode.PAST -> "No past tickets."
+                    }
+                )
+            }
         } else {
             // display scrollable list of booking cards
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
-                items(bookingWithEvents) { (booking, event) ->
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
+                items(displayedList) { (booking, event) ->
                     BookingHistoryItem(booking, event)
                 }
             }
@@ -326,7 +404,6 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                 }
             }
 
-
             event?.venue?.takeIf { it.isNotEmpty() }?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.LocationOn, "Venue", Modifier.size(16.dp))
@@ -449,7 +526,12 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
 fun DetailText(label: String, value: String) {
     Row {
         // label in medium weight
-        Text(label, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.width(4.dp))
 
         // value in bold
@@ -492,16 +574,36 @@ fun EventImage(rawUrl: String?) {
     }
 
     // image container box with rounded corners
-    Box(Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(12.dp)), Alignment.Center) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clip(RoundedCornerShape(12.dp)),
+        Alignment.Center
+    ) {
         if (displayUrl == null && !loadingError) {
             // show loading spinner while fetching
-            Box(Modifier.fillMaxSize().background(Color.LightGray.copy(alpha = 0.5f)), Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.LightGray.copy(alpha = 0.5f)),
+                Alignment.Center
+            ) {
                 CircularProgressIndicator()
             }
         } else if (loadingError) {
             // show error message if loading failed
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer), Alignment.Center) {
-                Text("Image unavailable", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.errorContainer),
+                Alignment.Center
+            ) {
+                Text(
+                    "Image unavailable",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
         } else {
             // display image using coil
@@ -521,7 +623,6 @@ fun timestampToString(ts: Timestamp): String {
         timeZone = TimeZone.getTimeZone("Asia/Singapore")
     }.format(ts.toDate())
 }
-
 
 // add event directly to phone's calendar database
 private fun addEventToCalendarDirectly(context: android.content.Context, event: Event) {

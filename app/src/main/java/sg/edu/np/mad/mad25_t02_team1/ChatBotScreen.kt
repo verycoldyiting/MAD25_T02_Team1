@@ -129,16 +129,78 @@ object LevenshteinUtils {
         return cost[len0 - 1]
     }
 
-    fun isCloseMatch(input: String, target: String, threshold: Int = 2): Boolean {
-        val normalizedInput = input.lowercase().trim()
-        val normalizedTarget = target.lowercase().trim()
+//    fun isCloseMatch(input: String, target: String, threshold: Int = 2): Boolean {
+//        val normalizedInput = input.lowercase().trim()
+//        val normalizedTarget = target.lowercase().trim()
+//
+//        if (normalizedInput == normalizedTarget) return true
+//        if (Math.abs(normalizedInput.length - normalizedTarget.length) > threshold) return false
+//
+//        return calculate(normalizedInput, normalizedTarget) <= threshold
+//    }
+}
 
-        if (normalizedInput == normalizedTarget) return true
-        if (Math.abs(normalizedInput.length - normalizedTarget.length) > threshold) return false
+object TextFuzzy {
 
-        return calculate(normalizedInput, normalizedTarget) <= threshold
+    fun normalize(s: String): String {
+        return s
+            .lowercase()
+            .trim()
+            .replace(Regex("[^a-z0-9\\s]"), " ")   // keep letters/numbers/spaces
+            .replace(Regex("\\s+"), " ")          // collapse spaces
+    }
+
+    fun tokens(s: String): List<String> =
+        normalize(s).split(" ").filter { it.isNotBlank() }
+
+    // Levenshtein distance
+    fun similarity(a: String, b: String): Double {
+        val aa = normalize(a).replace(" ", "")
+        val bb = normalize(b).replace(" ", "")
+        if (aa.isBlank() || bb.isBlank()) return 0.0
+        if (aa == bb) return 1.0
+        val dist = LevenshteinUtils.calculate(aa, bb)
+        val maxLen = maxOf(aa.length, bb.length).toDouble()
+        return (1.0 - dist / maxLen).coerceIn(0.0, 1.0)
+    }
+
+    fun fuzzyContains(input: String, target: String, threshold: Double = 0.78): Boolean {
+        val inTokens = tokens(input)
+        val t = normalize(target)
+        if (t.isBlank()) return false
+
+        if (inTokens.any { similarity(it, t) >= threshold }) return true
+
+        val windowSize = minOf(2, inTokens.size)
+        if (windowSize >= 2) {
+            for (i in 0..inTokens.size - 2) {
+                val phrase = inTokens[i] + " " + inTokens[i + 1]
+                if (similarity(phrase, t) >= threshold) return true
+            }
+        }
+        return false
+    }
+
+    fun bestKeywordScore(input: String, keywords: List<String>, threshold: Double = 0.78): Double {
+        var best = 0.0
+        val inTokens = tokens(input)
+
+        for (k in keywords) {
+            val kk = normalize(k)
+            for (t in inTokens) {
+                best = maxOf(best, similarity(t, kk))
+            }
+            if (inTokens.size >= 2) {
+                for (i in 0..inTokens.size - 2) {
+                    val phrase = inTokens[i] + " " + inTokens[i + 1]
+                    best = maxOf(best, similarity(phrase, kk))
+                }
+            }
+        }
+        return best
     }
 }
+
 
 class TranslationHelper {
     private val apiKey = BuildConfig.MY_API_KEY
@@ -294,9 +356,11 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
             "food", "drink", "beverage", "alcohol",
             "venue", "location"
         )
-        val lower = input.lowercase()
-        return keywords.any { lower.contains(it) }
+
+        // if any keyword matches fuzzily, treat as event-specific
+        return keywords.any { k -> TextFuzzy.fuzzyContains(input, k, threshold = 0.75) }
     }
+
 
     fun translateBotMessage(messageId: String, text: String, sourceLang: String) {
         viewModelScope.launch {
@@ -370,10 +434,11 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
                         clean.contains("sep") || clean.contains("oct") || clean.contains("nov") || clean.contains("dec")
 
             val isGeneralRequest =
-                clean.contains("upcoming") ||
-                        clean.contains("coming") ||
-                        clean.contains("next") ||
-                        (clean.contains("show") && clean.contains("event"))
+                TextFuzzy.fuzzyContains(clean, "upcoming", 0.75) ||
+                        TextFuzzy.fuzzyContains(clean, "coming", 0.75) ||
+                        TextFuzzy.fuzzyContains(clean, "next", 0.75) ||
+                        (TextFuzzy.fuzzyContains(clean, "show", 0.75) && TextFuzzy.fuzzyContains(clean, "event", 0.75))
+
 
             if (isMonthRequest || isGeneralRequest) {
                 removeLoading()
@@ -504,14 +569,18 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val matchedFaq = faqList
-            .filter { faq ->
-                faq.keywords.any { k ->
-                    val kLower = k.lowercase()
-                    Regex("\\b${Regex.escape(kLower)}\\b").containsMatchIn(clean) ||
-                            LevenshteinUtils.isCloseMatch(kLower, clean, 1)
-                }
+            .map { faq ->
+                val score = TextFuzzy.bestKeywordScore(
+                    input = clean,
+                    keywords = faq.keywords,
+                    threshold = 0.75
+                )
+                faq to score
             }
-            .maxByOrNull { it.priority }
+            .filter { it.second >= 0.75 }
+            .maxWithOrNull(compareBy<Pair<FAQ, Double>> { it.second }.thenBy { it.first.priority })
+            ?.first
+
 
         if (matchedFaq != null) {
             val genericAnswer = matchedFaq.answer ?: "I'm not sure."
@@ -582,19 +651,39 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
 
     // only match upcoming events (prevents selecting expired events)
     private fun checkForEventMatch(input: String): Event? {
-        val lowerInput = input.lowercase()
-        val inputSquashed = lowerInput.replace(Regex("[^a-z0-9]"), "")
+        val inputNorm = TextFuzzy.normalize(input)
+        val inputTokens = TextFuzzy.tokens(inputNorm)
 
-        val scoredEvents = upcomingEvents().map { event ->
-            val artistScore = calculateMatchScore(event.artist ?: "", lowerInput, inputSquashed)
-            val nameScore = calculateMatchScore(event.name ?: "", lowerInput, inputSquashed)
-            val bestScore = maxOf(artistScore, nameScore)
-            event to bestScore
+        fun scoreTitle(title: String?): Double {
+            val t = title ?: return 0.0
+            val titleTokens = TextFuzzy.tokens(t)
+            if (titleTokens.isEmpty() || inputTokens.isEmpty()) return 0.0
+
+            // token overlap score (fuzzy)
+            var hits = 0
+            for (tt in titleTokens) {
+                if (inputTokens.any { itTok -> TextFuzzy.similarity(itTok, tt) >= 0.78 }) {
+                    hits++
+                }
+            }
+            val overlap = hits.toDouble() / titleTokens.size.toDouble()
+
+            // also check full-string similarity
+            val full = TextFuzzy.similarity(inputNorm, t)
+
+            return maxOf(overlap, full)
         }
 
-        val bestMatch = scoredEvents.maxByOrNull { it.second }
-        return if (bestMatch != null && bestMatch.second > 0.7) bestMatch.first else null
+        val scored = upcomingEvents().map { e ->
+            val s1 = scoreTitle(e.artist)
+            val s2 = scoreTitle(e.name)
+            e to maxOf(s1, s2)
+        }
+
+        val best = scored.maxByOrNull { it.second }
+        return if (best != null && best.second >= 0.60) best.first else null
     }
+
 
     private fun calculateMatchScore(target: String, userInput: String, userSquashed: String): Double {
         val targetLower = target.lowercase()

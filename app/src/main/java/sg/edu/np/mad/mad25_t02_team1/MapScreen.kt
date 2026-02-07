@@ -39,6 +39,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.SearchByTextRequest
+import com.google.android.libraries.places.api.model.CircularBounds
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -159,20 +160,50 @@ private fun VenueMapScreenContent(
 
     // --- 3. Helper Function: Fetch Food ---
     fun fetchFood() {
-        Toast.makeText(context, "Searching restaurants...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Searching restaurants within 500m...", Toast.LENGTH_SHORT).show()
         scope.launch(Dispatchers.IO) {
             try {
                 val client = Places.createClient(context)
                 val fields = listOf(Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.RATING)
-                val request = SearchByTextRequest.builder("restaurants near $venueName", fields).setMaxResultCount(10).build()
+
+                // 1. Create a 500m Search Circle around the Venue
+                val bounds = CircularBounds.newInstance(venueLocation, 500.0)
+
+                // 2. Search strictly inside that circle
+                val request = SearchByTextRequest.builder("restaurant", fields)
+                    .setLocationBias(bounds)
+                    .setMaxResultCount(10)
+                    .build()
+
                 val response = client.searchByText(request).await()
 
-                val pins = response.places.sortedByDescending { it.rating }.take(5).mapNotNull {
-                    it.latLng?.let { loc -> MapPin(it.name ?: "", loc, "FOOD", it.rating) }
+                // 3. Double-check distance and sort by Rating
+                val pins = response.places.mapNotNull { place ->
+                    place.latLng?.let { loc ->
+                        val results = FloatArray(1)
+                        android.location.Location.distanceBetween(
+                            venueLocation.latitude, venueLocation.longitude,
+                            loc.latitude, loc.longitude,
+                            results
+                        )
+
+                        if (results[0] <= 500) {
+                            MapPin(place.name ?: "Unknown", loc, "FOOD", place.rating)
+                        } else null
+                    }
+                }.sortedByDescending { it.rating }.take(5)
+
+                withContext(Dispatchers.Main) {
+                    if (pins.isEmpty()) {
+                        Toast.makeText(context, "No food found within 500m", Toast.LENGTH_SHORT).show()
+                    } else {
+                        foodPins = pins
+                    }
                 }
-                withContext(Dispatchers.Main) { foodPins = pins }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Error finding food: ${e.message}", Toast.LENGTH_SHORT).show() }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -184,19 +215,44 @@ private fun VenueMapScreenContent(
             try {
                 val client = Places.createClient(context)
                 val fields = listOf(Place.Field.NAME, Place.Field.LAT_LNG)
-                val request = SearchByTextRequest.builder("bus stop near $venueName", fields).setMaxResultCount(10).build()
+
+                // 1. Create a 500m Search Circle
+                val bounds = CircularBounds.newInstance(venueLocation, 500.0)
+
+                // 2. Search for "bus stop" specifically in that circle
+                val request = SearchByTextRequest.builder("bus stop", fields)
+                    .setLocationBias(bounds) // <--- Crucial Fix
+                    .setMaxResultCount(10)
+                    .build()
+
                 val response = client.searchByText(request).await()
 
-                val pins = response.places.mapNotNull {
-                    it.latLng?.let { loc ->
+                val pins = response.places.mapNotNull { place ->
+                    place.latLng?.let { loc ->
                         val results = FloatArray(1)
-                        android.location.Location.distanceBetween(venueLocation.latitude, venueLocation.longitude, loc.latitude, loc.longitude, results)
-                        if (results[0] <= 300) MapPin(it.name ?: "", loc, "TRANSIT") else null
+                        android.location.Location.distanceBetween(
+                            venueLocation.latitude, venueLocation.longitude,
+                            loc.latitude, loc.longitude,
+                            results
+                        )
+                        // Keep within 500m
+                        if (results[0] <= 500) {
+                            MapPin(place.name ?: "Bus Stop", loc, "TRANSIT")
+                        } else null
                     }
                 }
-                withContext(Dispatchers.Main) { transitPins = pins }
+
+                withContext(Dispatchers.Main) {
+                    if (pins.isEmpty()) {
+                        Toast.makeText(context, "No bus stops found nearby", Toast.LENGTH_SHORT).show()
+                    } else {
+                        transitPins = pins
+                    }
+                }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Error finding transit: ${e.message}", Toast.LENGTH_SHORT).show() }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

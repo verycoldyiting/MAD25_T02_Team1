@@ -5,12 +5,14 @@ val localPropertiesFile = rootProject.file("local.properties")
 
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
+    println("✅ Gradle Found local.properties!")
+} else {
+    println("❌ Gradle could NOT find local.properties at: ${localPropertiesFile.absolutePath}")
 }
 
 val apiKey = localProperties.getProperty("MY_API_KEY") ?: ""
-
-
-
+val googleMapsKey = localProperties.getProperty("GOOGLE_MAPS_KEY") ?: ""
+println("🔑 Key seen by Gradle: '$googleMapsKey'")
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -51,6 +53,8 @@ android {
         )
 
 
+        manifestPlaceholders["MAPS_API_KEY"] = googleMapsKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$googleMapsKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -96,6 +100,7 @@ dependencies {
     // Compose / AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -118,6 +123,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("org.apache.commons:commons-text:1.10.0")
     implementation("com.google.zxing:core:3.5.2")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.smart.reply.common)
 
     // Stripe
@@ -133,13 +139,11 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.biometric:biometric:1.1.0")
 
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("com.google.zxing:core:3.5.2")
-    implementation(libs.androidx.navigation.compose)
+    // Google Maps
     implementation("com.google.maps.android:maps-compose:4.4.1")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
-    implementation("com.google.android.libraries.places:places:3.3.0")
+    implementation("com.google.android.libraries.places:places:3.5.0")
 }
 
 

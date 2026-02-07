@@ -5,14 +5,9 @@ val localPropertiesFile = rootProject.file("local.properties")
 
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
-    println("✅ Gradle Found local.properties!")
-} else {
-    println("❌ Gradle could NOT find local.properties at: ${localPropertiesFile.absolutePath}")
 }
-
 val apiKey = localProperties.getProperty("MY_API_KEY") ?: ""
 val googleMapsKey = localProperties.getProperty("GOOGLE_MAPS_KEY") ?: ""
-println("🔑 Key seen by Gradle: '$googleMapsKey'")
 
 plugins {
     alias(libs.plugins.androidApplication)

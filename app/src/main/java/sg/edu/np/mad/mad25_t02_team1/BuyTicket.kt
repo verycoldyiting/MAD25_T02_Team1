@@ -236,8 +236,14 @@ fun BuyTicketScreen() {
                     value = selectedCategory?.price?.let { "S$ %.2f".format(it) } ?: "Price",
                     onValueChange = {},
                     readOnly = true,
+                    enabled = false,
                     label = { Text("Price (Per Ticket)") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
 
                 Spacer(Modifier.height(16.dp))

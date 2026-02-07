@@ -1,5 +1,3 @@
-
-
 package sg.edu.np.mad.mad25_t02_team1
 
 
@@ -232,6 +230,7 @@ sealed class ChatMessage(val id: String = UUID.randomUUID().toString()) {
 class ChatbotViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
     private val translator = TranslationHelper()
+
     val messages = ChatRepository.messages
     val suggestedPrompts = ChatRepository.suggestedPrompts
 
@@ -239,6 +238,27 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
     private var faqList: List<FAQ> = emptyList()
     private var seatCategoryList: List<SeatCategory> = emptyList()
 
+
+    // Time helpers
+
+    private fun eventMillis(e: Event): Long? = e.date?.toDate()?.time
+
+    private fun isUpcoming(e: Event): Boolean {
+        val t = eventMillis(e) ?: return false
+        return t >= System.currentTimeMillis()
+    }
+
+    private fun upcomingEvents(): List<Event> {
+        return eventsList
+            .filter { isUpcoming(it) }
+            .sortedBy { it.date }
+    }
+
+    private fun getSgMonthIndex(date: java.util.Date): Int {
+        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Singapore"))
+        cal.time = date
+        return cal.get(java.util.Calendar.MONTH)
+    }
 
     init {
         ChatRepository.clearContext()
@@ -267,13 +287,15 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
     private fun isEventSpecificQuestion(input: String): Boolean {
         val keywords = listOf(
             "rain", "weather", "outdoor",
-            "wheelchair", "accessible",
+            "wheelchair", "accessible", "accessibility",
             "refund", "policy",
-            "age", "kids", "child",
+            "age", "kids", "child", "children",
             "time", "late", "parking",
-            "food", "drink", "beverage", "alcohol"
+            "food", "drink", "beverage", "alcohol",
+            "venue", "location"
         )
-        return keywords.any { input.contains(it) }
+        val lower = input.lowercase()
+        return keywords.any { lower.contains(it) }
     }
 
     fun translateBotMessage(messageId: String, text: String, sourceLang: String) {
@@ -304,22 +326,23 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
             } else inputText
 
             val clean = englishInput.lowercase()
-            val normalizedInput = clean
-                .replace("-", "")
-                .replace(" ", "")
+            val normalizedInput = clean.replace("-", "").replace(" ", "")
 
-            // GENRE SEARCH
+            val upcomingSorted = upcomingEvents()
+
+            // genre search
+
             val allGenreTags = eventsList.flatMap {
                 it.genreNormalized.map { t -> t.lowercase().replace("-", "").replace(" ", "") }
             }.distinct()
 
-            // Find if any of the tags appear in user input
             val foundGenre = allGenreTags.find { tag -> normalizedInput.contains(tag) }
 
             if (foundGenre != null) {
                 removeLoading()
-                // Filter events matching the genre found
-                val genreEvents = eventsList.filter { event ->
+
+                // Only upcoming events in genre results
+                val genreEvents = upcomingSorted.filter { event ->
                     event.genreNormalized.any {
                         it.lowercase().replace("-", "").replace(" ", "") == foundGenre
                     }
@@ -327,43 +350,38 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
 
                 ChatRepository.selectedEvent = null
 
-
                 if (genreEvents.isNotEmpty()) {
-                    addMessage(ChatMessage.Bot("Here are the ${foundGenre.replaceFirstChar { it.uppercase() }} events:"))
+                    addMessage(
+                        ChatMessage.Bot(
+                            "Here are the ${foundGenre.replaceFirstChar { it.uppercase() }} events:"
+                        )
+                    )
                     addMessage(ChatMessage.BotCarousel(genreEvents))
                 } else {
-                    addMessage(ChatMessage.Bot("I couldn't find any events for $foundGenre."))
+                    addMessage(ChatMessage.Bot("I couldn't find any upcoming events for $foundGenre."))
                 }
                 return@launch
             }
 
-            // Month/Upcoming Filtering
-
+            // Month/Upcoming Filtering (UPCOMING ONLY)
             val isMonthRequest =
-                clean.contains("jan") || clean.contains("feb") || clean.contains("mar") || clean.contains(
-                    "apr"
-                ) ||
-                        clean.contains("may") || clean.contains("jun") || clean.contains("jul") || clean.contains(
-                    "aug"
-                ) ||
-                        clean.contains("sep") || clean.contains("oct") || clean.contains("nov") || clean.contains(
-                    "dec"
-                )
+                clean.contains("jan") || clean.contains("feb") || clean.contains("mar") || clean.contains("apr") ||
+                        clean.contains("may") || clean.contains("jun") || clean.contains("jul") || clean.contains("aug") ||
+                        clean.contains("sep") || clean.contains("oct") || clean.contains("nov") || clean.contains("dec")
 
-            // Updated check to catch "coming", "next", "show me events"
             val isGeneralRequest =
-                clean.contains("upcoming") || clean.contains("coming") || clean.contains("next") || (clean.contains(
-                    "show"
-                ) && clean.contains("event"))
+                clean.contains("upcoming") ||
+                        clean.contains("coming") ||
+                        clean.contains("next") ||
+                        (clean.contains("show") && clean.contains("event"))
 
             if (isMonthRequest || isGeneralRequest) {
                 removeLoading()
-                if (eventsList.isEmpty()) {
-                    addMessage(ChatMessage.Bot("I'm currently updating my database. Please check back later!"))
+
+                if (upcomingSorted.isEmpty()) {
+                    addMessage(ChatMessage.Bot("There are no upcoming events right now."))
                     return@launch
                 }
-
-                val allEventsSorted = eventsList.sortedBy { it.date }
 
                 // Month Logic
                 val monthMap = mapOf(
@@ -386,31 +404,30 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
                     val targetMonthIndex = foundMonth.value
                     val monthName = foundMonth.key.replaceFirstChar { it.uppercase() }
 
-                    val filteredEvents = allEventsSorted.filter { event ->
-                        event.date?.toDate()?.month == targetMonthIndex
+                    val filteredEvents = upcomingSorted.filter { event ->
+                        event.date?.toDate()?.let { getSgMonthIndex(it) == targetMonthIndex } == true
                     }
 
                     if (filteredEvents.isNotEmpty()) {
-                        addMessage(ChatMessage.Bot("Here are the events happening in $monthName:"))
+                        addMessage(ChatMessage.Bot("Here are the upcoming events happening in $monthName:"))
                         addMessage(ChatMessage.BotCarousel(filteredEvents))
                     } else {
-                        addMessage(ChatMessage.Bot("I couldn't find any events in $monthName."))
+                        addMessage(ChatMessage.Bot("I couldn't find any upcoming events in $monthName."))
                     }
                     return@launch
                 }
 
-                // General "Upcoming" Logic 
-                // Find a digit in the user's string
-                val numberRegex = Regex("\\d+")
-                val numberMatch = numberRegex.find(clean)
-
+                // General "Upcoming" Logic
+                val numberMatch = Regex("\\d+").find(clean)
                 val countToTake = numberMatch?.value?.toIntOrNull()?.coerceIn(1, 10) ?: 5
 
                 addMessage(ChatMessage.Bot("Here are the next $countToTake upcoming events:"))
-                addMessage(ChatMessage.BotCarousel(allEventsSorted.take(countToTake)))
+                addMessage(ChatMessage.BotCarousel(upcomingSorted.take(countToTake)))
                 return@launch
             }
 
+            // Event match + FAQ
+            //  Ensure event matching also ignores expired events
 
             val newEventFound =
                 if (ChatRepository.selectedEvent != null && isEventSpecificQuestion(englishInput)) {
@@ -423,19 +440,14 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
                 ChatRepository.selectedEvent = newEventFound
             }
 
-
-            // Smart Response (Context Injection)
-
             val responseEnglish = generateSmartResponse(englishInput, newEventFound)
 
-            // Translate back
             val finalResponse = if (detectedLang != "en") {
                 translator.translate(responseEnglish, detectedLang, "en")
             } else responseEnglish
 
             removeLoading()
 
-            // Always add the bot text
             addMessage(
                 ChatMessage.Bot(
                     text = finalResponse,
@@ -444,49 +456,53 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
 
-            // Only show event card if this was an explicit event discovery
             if (newEventFound != null && !isEventSpecificQuestion(englishInput)) {
                 addMessage(ChatMessage.BotEvent(newEventFound))
             }
 
             updateSuggestedPrompts(detectedLang)
-
-
         }
     }
 
-    // Context-Aware Response Generator
+    // Response Generator
     private fun generateSmartResponse(input: String, newEvent: Event?): String {
         val clean = input.lowercase()
-
-        // Resolve context
         val targetEvent = newEvent ?: ChatRepository.selectedEvent
 
-        // Event-aware answers (NO FAQ YET)
+        if (Regex("\\bhow are you\\b").containsMatchIn(clean) || Regex("\\bhow r u\\b").containsMatchIn(clean)) {
+            return "I’m doing good! Tell me what event you’re looking for, or type 'upcoming events'."
+        }
+
+        if (targetEvent == null) {
+            if (clean.contains("rain") || clean.contains("weather")) {
+                return "It depends on whether the event is indoor or outdoor. Tell me the event name, or type 'upcoming events' to choose one."
+            }
+            if (clean.contains("wheelchair") || clean.contains("accessible") || clean.contains("accessibility")) {
+                return "Most venues provide accessibility options, but it depends on the venue. Tell me the event name so I can check."
+            }
+            if (clean.contains("refund") || clean.contains("policy")) {
+                return "Refund policies vary by organiser/event. Tell me the event name, or open an event to see its refund policy."
+            }
+        }
 
         if (targetEvent != null && isEventSpecificQuestion(clean)) {
-
-            // Rain / Weather
             if (clean.contains("rain") || clean.contains("weather")) {
                 return when (targetEvent.isOutdoor) {
-                    true -> "This is an **outdoor event**, so weather conditions may affect the show. Please check official announcements closer to the event date."
-                    false -> "This is an **indoor event**, so weather conditions will not affect the event."
+                    true -> "This is an outdoor event, so weather conditions may affect the show. Please check official announcements closer to the event date."
+                    false -> "This is an indoor event, so weather conditions will not affect the event."
                     else -> "Please check official announcements for weather-related updates for this event."
                 }
             }
 
-            // Wheelchair accessibility
-            if (clean.contains("wheelchair") || clean.contains("accessible")) {
+            if (clean.contains("wheelchair") || clean.contains("accessible") || clean.contains("accessibility")) {
                 return when (targetEvent.isWheelchairAccessible) {
-                    true -> "Yes, **${targetEvent.venue ?: "this venue"}** is wheelchair accessible."
-                    false -> "Unfortunately, **${targetEvent.venue ?: "this venue"}** is not wheelchair accessible based on current information."
-                    else -> "Please check directly with **${targetEvent.venue ?: "the venue"}** regarding wheelchair accessibility."
+                    true -> "Yes, ${targetEvent.venue ?: "this venue"} is wheelchair accessible. If you need help on-site, please approach the venue staff."
+                    false -> "Unfortunately, ${targetEvent.venue ?: "this venue"} is not wheelchair accessible based on current info. You may want to contact the venue to confirm available assistance."
+                    else -> "I don’t have confirmed accessibility info for ${targetEvent.venue ?: "the venue"}. Please check with the venue directly for the latest details."
                 }
             }
         }
 
-
-        // FAQ with event injection
         val matchedFaq = faqList
             .filter { faq ->
                 faq.keywords.any { k ->
@@ -499,73 +515,46 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
 
         if (matchedFaq != null) {
             val genericAnswer = matchedFaq.answer ?: "I'm not sure."
-
-            if (targetEvent != null) {
-                return customizeAnswerForEvent(
-                    matchedFaq.category,
-                    genericAnswer,
-                    targetEvent
-                )
-            } else {
-                return genericAnswer
-            }
+            return if (targetEvent != null) {
+                customizeAnswerForEvent(matchedFaq.category, genericAnswer, targetEvent)
+            } else genericAnswer
         }
-
-
-        // Event discovery
 
         if (newEvent != null) {
-            return "I found **${newEvent.name}**! You can ask me about tickets, venue, timing, or accessibility."
+            return "I found ${newEvent.name}! You can ask me about tickets, venue, timing, or accessibility."
         }
-
-
-        // Small talk
 
         if (Regex("^(hi|hello|hey)\\b", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
             return "Hello! I can help answer questions about upcoming concerts and events."
         }
 
-        // Fallback
-
         return "I'm not sure. Try asking about a specific artist, genre (like 'Pop'), or event details."
     }
 
-
-    private fun customizeAnswerForEvent(
-        category: String?,
-        genericAnswer: String,
-        event: Event
-    ): String {
+    private fun customizeAnswerForEvent(category: String?, genericAnswer: String, event: Event): String {
         return when (category) {
             "tickets", "payment" -> {
                 val prices = seatCategoryList.map { it.price }
                 if (prices.isNotEmpty()) {
-                    val minPrice = prices.minOrNull() ?: 0.0
-                    val maxPrice = prices.maxOrNull() ?: 0.0
-                    val minStr = String.format("%.2f", minPrice)
-                    val maxStr = String.format("%.2f", maxPrice)
-                    "For **${event.artist}**, ticket prices range from **$$minStr to $$maxStr**. $genericAnswer"
+                    val minStr = String.format("%.2f", prices.minOrNull() ?: 0.0)
+                    val maxStr = String.format("%.2f", prices.maxOrNull() ?: 0.0)
+                    "For ${event.artist}, ticket prices range from $$minStr to $$maxStr. $genericAnswer"
                 } else {
                     "For ${event.artist}, check the app for specific pricing. $genericAnswer"
                 }
             }
 
-            "venue", "parking", "food" -> {
-                "This event is at **${event.venue}**. $genericAnswer"
-            }
-
-            "timing", "late_entry" -> {
-                "The event starts on **${formatDate(event.date)}**. $genericAnswer"
-            }
+            "venue", "parking", "food" -> "This event is at ${event.venue}. $genericAnswer"
+            "timing", "late_entry" -> "The event starts on ${formatDate(event.date)}. $genericAnswer"
 
             "refunds", "policy" -> {
                 val policy = event.refundPolicy ?: "Standard rules apply"
-                "For **${event.artist}**, the policy is: **$policy**. $genericAnswer"
+                "For ${event.artist}, the policy is: $policy. $genericAnswer"
             }
 
             "accessibility", "wheelchair", "disability", "handicap" -> {
                 val accessText = when (event.isWheelchairAccessible) {
-                    true -> "Yes, **${event.venue ?: "the venue"}** is wheelchair accessible."
+                    true -> "Yes, ${event.venue ?: "the venue"} is wheelchair accessible."
                     false -> "Unfortunately, this event has limited wheelchair accessibility."
                     else -> "Please check directly with the venue regarding accessibility."
                 }
@@ -573,10 +562,9 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
             }
 
             "age", "child", "children", "kids", "restriction", "baby" -> {
-                // Check the String field from your Event.kt
                 val restriction = event.ageRestriction
                 val ageText = if (!restriction.isNullOrBlank()) {
-                    "The age policy for this event is: **$restriction**."
+                    "The age policy for this event is: $restriction."
                 } else {
                     "There is no specific age restriction listed for this event."
                 }
@@ -585,41 +573,30 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
 
             "genre", "style", "type" -> {
                 val genreText = event.genre ?: "General"
-                "This is a **$genreText** event. $genericAnswer"
+                "This is a $genreText event. $genericAnswer"
             }
 
             else -> genericAnswer
         }
     }
 
-
+    // only match upcoming events (prevents selecting expired events)
     private fun checkForEventMatch(input: String): Event? {
         val lowerInput = input.lowercase()
         val inputSquashed = lowerInput.replace(Regex("[^a-z0-9]"), "")
 
-        val scoredEvents = eventsList.map { event ->
-            // 1. Exact/Close Artist Match 
+        val scoredEvents = upcomingEvents().map { event ->
             val artistScore = calculateMatchScore(event.artist ?: "", lowerInput, inputSquashed)
-
-            // 2. Exact/Close Event Name Match 
             val nameScore = calculateMatchScore(event.name ?: "", lowerInput, inputSquashed)
-
-
             val bestScore = maxOf(artistScore, nameScore)
-            Pair(event, bestScore)
+            event to bestScore
         }
 
-        // Increased threshold slightly to prevent false positives
         val bestMatch = scoredEvents.maxByOrNull { it.second }
         return if (bestMatch != null && bestMatch.second > 0.7) bestMatch.first else null
     }
 
-
-    private fun calculateMatchScore(
-        target: String,
-        userInput: String,
-        userSquashed: String
-    ): Double {
+    private fun calculateMatchScore(target: String, userInput: String, userSquashed: String): Double {
         val targetLower = target.lowercase()
         val targetSquashed = targetLower.replace(Regex("[^a-z0-9]"), "")
 
@@ -639,7 +616,6 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
             val errorRatio = minDistance.toDouble() / len.toDouble()
             if (errorRatio < 0.35) return 1.0 - errorRatio
         } else {
-            // For abbreviations like "blk pnk"
             if (isSubsequence(userSquashed, targetSquashed)) {
                 if (userSquashed.length.toDouble() / targetSquashed.length.toDouble() > 0.5) return 0.85
             }
@@ -647,14 +623,11 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
         return 0.0
     }
 
-    // Helper for abbreviations
     private fun isSubsequence(s1: String, s2: String): Boolean {
         var i = 0
         var j = 0
         while (i < s1.length && j < s2.length) {
-            if (s1[i] == s2[j]) {
-                i++
-            }
+            if (s1[i] == s2[j]) i++
             j++
         }
         return i == s1.length
@@ -672,16 +645,24 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
     private fun removeLoading() = ChatRepository.removeLoading()
 }
 
+
 fun launchSpeechRecognizer(
     context: Context,
-    launcher: ManagedActivityResultLauncher<Intent, ActivityResult>
+    launcher: ManagedActivityResultLauncher<Intent, ActivityResult>,
+    languageTag: String? = null
 ) {
+    val lang = languageTag ?: Locale.getDefault().toLanguageTag()
+
     val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-        putExtra(
-            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-        )
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+
+        // Force recognition language
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+
+        // Improve chance the recognizer respects your language
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
+        putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, true)
+
         putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
     }
 
@@ -691,6 +672,8 @@ fun launchSpeechRecognizer(
         Toast.makeText(context, "Speech recognition not supported", Toast.LENGTH_SHORT).show()
     }
 }
+
+
 
 
 

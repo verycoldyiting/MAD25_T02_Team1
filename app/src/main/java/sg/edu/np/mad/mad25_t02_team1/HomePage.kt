@@ -207,15 +207,28 @@ fun HomePageContent() {
                 if (snapshot != null) {
 
                     val allEvents = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(Event::class.java)
+                        val e = doc.toObject(Event::class.java)
+                        e?.copy(id = doc.id)
                     }
 
-                    // Sort by date field from new model
-                    val sorted = allEvents.sortedBy { it.date }
+                    val now = System.currentTimeMillis()
 
-                    upcomingEvents = sorted.take(3)
-                    availableEvents = sorted
+                    // upcoming events
+                    val upcomingOnly = allEvents
+                        .filter { event ->
+                            val t = event.date?.toDate()?.time ?: 0L
+                            t == 0L || t >= now
+                        }
+
+                        .sortedBy { event ->
+                            val t = event.date?.toDate()?.time ?: 0L
+                            if (t == 0L) Long.MAX_VALUE else t
+                        }
+
+                    upcomingEvents = upcomingOnly.take(3)
+                    availableEvents = upcomingOnly
                 }
+
             }
         onDispose {
             listener.remove()

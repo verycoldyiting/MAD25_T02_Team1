@@ -47,7 +47,7 @@ class EventDetailsActivity : ComponentActivity() {
             MAD25_T02_Team1Theme {
                 EventDetailsScreen(
                     eventId = eventId,
-                    onBackPressed = { finish() } // Closes activity when back is pressed }
+                    onBackPressed = { finish() }
                 )
             }
         }
@@ -66,8 +66,12 @@ fun EventDetailsScreen(
     var loadingImage by remember { mutableStateOf(true) }
     var imageError by remember { mutableStateOf<String?>(null) }
 
+    // Track past / ended
+    var isPastEvent by remember { mutableStateOf(false) }
+
     // Fetch Event details from Firestore based on eventId
     LaunchedEffect(eventId) {
+        isLoading = true
         try {
             val doc = FirebaseFirestore.getInstance()
                 .collection("Events")
@@ -75,40 +79,45 @@ fun EventDetailsScreen(
                 .get()
                 .await()
 
-            event = doc.toObject(Event::class.java)
-            Log.d("EventDetails", "Event loaded: ${event?.name}, Image: ${event?.eventImage}")
+            val loaded = doc.toObject(Event::class.java)?.copy(id = doc.id)
+            event = loaded
+
+            val now = System.currentTimeMillis()
+            val eventTime = loaded?.date?.toDate()?.time ?: 0L
+            // if eventTime == 0L => Date TBA => NOT past
+            isPastEvent = eventTime != 0L && eventTime < now
+
+            Log.d("EventDetails", "Event loaded: ${event?.name}, dateMillis=$eventTime, past=$isPastEvent")
         } catch (e: Exception) {
             Log.e("EventDetails", "Error loading event: ${e.message}", e)
+            event = null
+            isPastEvent = false
+        } finally {
+            isLoading = false
         }
-        isLoading = false
     }
 
-    // Load event image
-    // Logic to handle both direct HTTP links and Firebase Storage (gs://) paths
+    // Load event image (handle HTTP and gs://)
     LaunchedEffect(event?.eventImage) {
         loadingImage = true
-        val rawUrl = event?.eventImage?.trim() ?: ""
+        imageError = null
+        val rawUrl = event?.eventImage?.trim().orEmpty()
 
         if (rawUrl.isEmpty()) {
+            imageUrl = null
             loadingImage = false
-            imageError = null
             return@LaunchedEffect
         }
 
         imageUrl = if (rawUrl.startsWith("gs://")) {
             try {
-                Log.d("ImageLoad", "Loading gs:// URL: $rawUrl")
                 val ref = FirebaseStorage.getInstance().getReferenceFromUrl(rawUrl)
-                ref.downloadUrl.await().toString().also {
-                    Log.d("ImageLoad", "Successfully loaded image URL: $it")
-                }
+                ref.downloadUrl.await().toString()
             } catch (e: Exception) {
-                Log.e("ImageLoad", "Failed to get download URL for ${event?.name}", e)
                 imageError = e.message
                 null
             }
         } else {
-            Log.d("ImageLoad", "Direct URL: $rawUrl")
             rawUrl
         }
 
@@ -117,13 +126,9 @@ fun EventDetailsScreen(
 
     Scaffold(
         topBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-            ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 TicketLahHeader()
 
-                // Back Button
                 IconButton(
                     onClick = onBackPressed,
                     modifier = Modifier
@@ -135,9 +140,7 @@ fun EventDetailsScreen(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.White,
-                        modifier = Modifier
-                            .padding(6.dp)
-                            .size(24.dp)
+                        modifier = Modifier.padding(6.dp).size(24.dp)
                     )
                 }
             }
@@ -150,7 +153,6 @@ fun EventDetailsScreen(
                 .fillMaxSize()
                 .background(Color(0xFFF5F5F5))
         ) {
-
             when {
                 isLoading -> Box(
                     modifier = Modifier.fillMaxSize(),
@@ -161,7 +163,8 @@ fun EventDetailsScreen(
                     event = event!!,
                     imageUrl = imageUrl,
                     loadingImage = loadingImage,
-                    imageError = imageError
+                    imageError = imageError,
+                    isPastEvent = isPastEvent
                 )
 
                 else -> Box(
@@ -173,21 +176,17 @@ fun EventDetailsScreen(
     }
 }
 
-/**
- * Displays the content of the event once data is successfully loaded.
- */
 @Composable
 fun EventDetailsContent(
     event: Event,
     imageUrl: String?,
     loadingImage: Boolean,
-    imageError: String?
+    imageError: String?,
+    isPastEvent: Boolean
 ) {
     val context = LocalContext.current
 
-    Column(
-        modifier = Modifier.verticalScroll(rememberScrollState())
-    ) {
+    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
 
         // IMAGE
         Box(
@@ -204,48 +203,23 @@ fun EventDetailsContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
-                        "Failed to load image",
-                        color = Color.Red,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Failed to load image", color = Color.Red, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        imageError,
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                    Text(imageError, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(horizontal = 16.dp))
                 }
 
                 imageUrl != null -> AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
                         .crossfade(true)
-                        .listener(
-                            onError = { _, result ->
-                                Log.e("AsyncImage", "Error loading image: ${result.throwable.message}")
-                            },
-                            onSuccess = { _, _ ->
-                                Log.d("AsyncImage", "Image loaded successfully")
-                            }
-                        )
                         .build(),
                     contentDescription = event.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
 
-                else -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("No Image Available", color = Color.Gray)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Image path: ${event.eventImage ?: "null"}",
-                        fontSize = 10.sp,
-                        color = Color.LightGray
-                    )
                 }
             }
         }
@@ -265,6 +239,15 @@ fun EventDetailsContent(
                     fontWeight = FontWeight.Bold
                 )
 
+                if (isPastEvent) {
+                    Spacer(Modifier.height(8.dp))
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text("Event Ended") }
+                    )
+                }
+
                 Spacer(Modifier.height(8.dp))
 
                 Text(
@@ -277,11 +260,7 @@ fun EventDetailsContent(
 
                 // Date
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.CalendarToday,
-                        contentDescription = "",
-                        tint = Color(0xFF2196F3)
-                    )
+                    Icon(Icons.Default.CalendarToday, contentDescription = "", tint = Color(0xFF2196F3))
                     Spacer(Modifier.width(12.dp))
 
                     Column {
@@ -291,18 +270,12 @@ fun EventDetailsContent(
                 }
 
                 Spacer(Modifier.height(16.dp))
-
                 Divider()
-
                 Spacer(Modifier.height(16.dp))
 
                 // Venue
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        contentDescription = "",
-                        tint = Color(0xFF2196F3)
-                    )
+                    Icon(Icons.Default.LocationOn, contentDescription = "", tint = Color(0xFF2196F3))
                     Spacer(Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
@@ -317,23 +290,41 @@ fun EventDetailsContent(
             }
         }
 
-        // BUY BUTTON
-        Button(
-            onClick = {
-                val intent = Intent(context, BuyTicketActivity::class.java)
-                intent.putExtra("EVENT_ID", event.id)
-                context.startActivity(intent)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = YELLOW,
-                contentColor = Color.Black
-            )
-        ) {
-            Text("Buy Tickets", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        // If past event, show disabled state instead of Buy button
+        if (isPastEvent) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFEAEAEA))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "This event has ended. Ticket sales are closed.",
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Gray
+                    )
+                }
+            }
+        } else {
+            Button(
+                onClick = {
+                    val intent = Intent(context, BuyTicketActivity::class.java)
+                    intent.putExtra("EVENT_ID", event.id)
+                    context.startActivity(intent)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = YELLOW,
+                    contentColor = Color.Black
+                )
+            ) {
+                Text("Buy Tickets", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -348,11 +339,7 @@ fun EventDetailsContent(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
 
-                    Text(
-                        "Event Information",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
+                    Text("Event Information", fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
                     event.artist?.let {
                         Spacer(Modifier.height(12.dp))
@@ -376,18 +363,12 @@ fun EventDetailsContent(
 
                     event.isWheelchairAccessible?.let {
                         Spacer(Modifier.height(12.dp))
-                        InfoRow(
-                            "Wheelchair Accessible",
-                            if (it) "Yes" else "No"
-                        )
+                        InfoRow("Wheelchair Accessible", if (it) "Yes" else "No")
                     }
 
                     event.isOutdoor?.let {
                         Spacer(Modifier.height(12.dp))
-                        InfoRow(
-                            "Event Type",
-                            if (it) "Outdoor" else "Indoor"
-                        )
+                        InfoRow("Event Type", if (it) "Outdoor" else "Indoor")
                     }
 
                     event.refundPolicy?.let {
@@ -399,27 +380,22 @@ fun EventDetailsContent(
         }
 
         Spacer(Modifier.height(24.dp))
-
     }
 }
 
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.Top
     ) {
-        // Label
         Text(
             text = label,
             color = Color.Gray,
             fontSize = 14.sp,
-            modifier = Modifier.width(140.dp) // fixed label width
+            modifier = Modifier.width(140.dp)
         )
 
-        // Value (wraps naturally, left-aligned)
         Text(
             text = value,
             fontWeight = FontWeight.Medium,
@@ -430,27 +406,10 @@ fun InfoRow(label: String, value: String) {
     }
 }
 
-
-
-
-/**
- * Utility to format Firebase Timestamp into readable date string
- */
-//fun formatDate(ts: com.google.firebase.Timestamp?): String {
-//    if (ts == null) return "Date TBA"
-//    return SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
-//        .format(ts.toDate())
-//}
-
 fun formatDate(ts: com.google.firebase.Timestamp?): String {
     if (ts == null) return "Date TBA"
 
-    val formatter = SimpleDateFormat(
-        "EEE, MMM dd yyyy h:mm a",
-        Locale.getDefault()
-    )
-
+    val formatter = SimpleDateFormat("EEE, MMM dd yyyy h:mm a", Locale.getDefault())
     formatter.timeZone = TimeZone.getTimeZone("Asia/Singapore")
-
     return formatter.format(ts.toDate())
 }

@@ -539,7 +539,6 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
 @Composable
 fun DetailText(label: String, value: String) {
     Row {
-        // label in medium weight
         Text(
             label,
             fontWeight = FontWeight.Medium,
@@ -655,10 +654,8 @@ private fun addEventToCalendarDirectly(context: android.content.Context, event: 
             return
         }
 
-        // FIX: The time is 8 hours behind, so we need to ADD 8 hours
-        val eightHoursInMillis = 8 * 60 * 60 * 1000L
-        val correctedStartMillis = eventDateMillis + eightHoursInMillis
-        val correctedEndMillis = correctedStartMillis + (3 * 60 * 60 * 1000L) // 3 hour duration
+        val correctedStartMillis = eventDateMillis
+        val correctedEndMillis = correctedStartMillis + (3 * 60 * 60 * 1000L)
 
         val values = ContentValues().apply {
             put(CalendarContract.Events.DTSTART, correctedStartMillis)
@@ -673,7 +670,7 @@ private fun addEventToCalendarDirectly(context: android.content.Context, event: 
             })
             put(CalendarContract.Events.EVENT_LOCATION, event.venue ?: "")
             put(CalendarContract.Events.CALENDAR_ID, calendarId)
-            put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
+            put(CalendarContract.Events.EVENT_TIMEZONE, "Asia/Singapore")
         }
 
         val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
@@ -691,7 +688,7 @@ private fun addEventToCalendarDirectly(context: android.content.Context, event: 
                 context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, reminderValues)
             }
 
-            Toast.makeText(context, "✓ Event added to calendar!", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "âœ“ Event added to calendar!", Toast.LENGTH_LONG).show()
         } else {
             Toast.makeText(context, "Failed to add event to calendar", Toast.LENGTH_SHORT).show()
         }

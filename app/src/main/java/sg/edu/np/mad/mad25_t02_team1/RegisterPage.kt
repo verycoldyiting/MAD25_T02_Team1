@@ -293,12 +293,12 @@ fun RegisterScreen(modifier: Modifier = Modifier) {
     }
 }
 
-// PHONE VALIDATION
+// phone validation
 fun isValidPhone(phone: String): Boolean {
     return phone.matches(Regex("^[89][0-9]{7}$"))
 }
 
-// PASSWORD VALIDATION
+// password validation
 fun isValidPassword(password: String): Boolean {
     val regex = Regex("^(?=.*[A-Z])(?=.*\\d)(?=.*[@#\$%^&+=!])(?!.*\\s).{8,}$")
     return regex.matches(password)

@@ -257,7 +257,7 @@ Natalie -
 8. Robust Error Handling
 * Graceful fallbacks for translation failures, missing mic permissions, and unavailable speech recognition.
 
-## Enhanced Stage 1 Feature: Stripe Third-Party Payment Integration [Valerie Kho]
+## Stripe Third-Party Payment Integration [Valerie Kho]
 The Payment Details Page has been enhanced to support a real third-party payment workflow using Stripe, improving checkout security, reliability, and overall user experience compared to Stage 1.
 1. Secure Stripe Checkout (PaymentSheet)
 * Integrated Stripe PaymentSheet for a native, secure card payment UX.
@@ -277,14 +277,9 @@ The Booking History feature was enhanced to improve usability and ticket managem
     * **Past: shows tickets for events that have already ended, sorted by most recent past event first.**
 * Each tab has a meaningful empty state message (e.g., “No upcoming tickets.”).
 
-## Enhanced Stage 1 Feature: Event Details Page with Dynamic Event Information + Past Event Handling [Valerie Kho]
-The Event Details page was enhanced to provide users with richer event context and safer interactions, by dynamically loading event data from Firestore, displaying structured event information, and preventing ticket purchase for ended events.
-1. Past Event Detection + Ticket Sales Disabled
-* Automatically detects whether an event is already over using event date vs current time.
-* If event has ended:
-    * **Shows a visible status label “Event Ended”**
-    * **Replaces “Buy Tickets” with a disabled message: “Ticket sales are closed.”**
-2. Structured “Event Information” Section (More Details for Users)
+## Enhanced Stage 1 Feature: Event Details Page with Dynamic Event Information [Valerie Kho]
+The Event Details page was enhanced to provide users with richer event context and safer interactions, by dynamically loading event data from Firestore and displaying structured event information.
+1. Structured “Event Information” Section (More Details for Users)
 * Adds a dedicated Event Information card that conditionally shows available fields such as:
     * **Artist**
     * **Genre**

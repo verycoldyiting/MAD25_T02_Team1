@@ -52,6 +52,7 @@ import sg.edu.np.mad.mad25_t02_team1.models.Event
 import java.text.SimpleDateFormat
 import java.util.*
 
+// enum for the three ticket filter tabs
 private enum class TicketViewMode { UPCOMING, RECENT, PAST }
 
 @Composable
@@ -67,6 +68,7 @@ fun BookingHistoryScaffold() {
                 selectedItem = selectedTab,
                 onItemSelected = { item ->
                     if (selectedTab == item) {
+                        // if already on tickets tab, trigger a refresh
                         if (item == BottomNavItem.Tickets) {
                             refreshTrigger++
                         }
@@ -137,6 +139,7 @@ fun BookingHistoryScreen() {
 
             val accountRef = db.document("/Account/$resolvedCustomAccId")
 
+            // query all bookings linked to this account
             val bookingSnapshot = db.collection("BookingDetails")
                 .whereEqualTo("AccID", accountRef)
                 .get()
@@ -147,6 +150,7 @@ fun BookingHistoryScreen() {
                 doc.toObject(Booking::class.java)?.copy(id = doc.id)
             }
 
+            // fetch event details for each booking
             val eventTasks = bookingList.mapNotNull { booking ->
                 booking.eventId?.let { db.collection("Events").document(it).get() }
             }
@@ -177,18 +181,20 @@ fun BookingHistoryScreen() {
 
     val now = System.currentTimeMillis()
 
-    // filter + sorting logic
+    // filter + sorting logic based on selected view mode
     val displayedList = remember(bookingWithEvents, viewMode, now) {
 
         fun eventTimeMillis(event: Event?): Long {
             return event?.date?.toDate()?.time ?: 0L
         }
 
+        // upcoming = events that haven't happened yet
         val upcoming = bookingWithEvents.filter { (_, event) ->
             val t = eventTimeMillis(event)
             t == 0L || t >= now
         }
 
+        // past = events that have already happened
         val past = bookingWithEvents.filter { (_, event) ->
             val t = eventTimeMillis(event)
             t in 1 until now
@@ -216,11 +222,10 @@ fun BookingHistoryScreen() {
         }
     }
 
-
     // display ui based on loading state
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
 
-        //  3 filter chips row
+        // three filter chips row for upcoming, recently purchased, past
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -247,10 +252,10 @@ fun BookingHistoryScreen() {
         Spacer(Modifier.height(8.dp))
 
         if (isLoading) {
-            // show loading spinner
+            // show loading spinner while fetching data
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else if (displayedList.isEmpty()) {
-            // show empty state message depending on tab
+            // show empty state message depending on which tab is selected
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     when (viewMode) {
@@ -281,12 +286,14 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
     val coroutineScope = rememberCoroutineScope()
     var isPressed by remember { mutableStateOf(false) }
     var pendingEvent by remember { mutableStateOf<Event?>(null) }
+
+    // launcher to request calendar permissions at runtime
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (allGranted) {
-            // add event to calendar
+            // permissions granted, add event to calendar
             pendingEvent?.let { evt ->
                 addEventToCalendarDirectly(context, evt)
             }
@@ -308,6 +315,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             EventImage(rawUrl = event?.eventImage ?: booking.eventImage)
             Spacer(modifier = Modifier.height(16.dp))
 
+            // event name
             Text(
                 text = event?.name ?: booking.concertTitle.orEmpty().ifEmpty { "Unknown Event" },
                 fontWeight = FontWeight.ExtraBold,
@@ -327,12 +335,14 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // event date row with "add to calendar" button
             event?.date?.let { eventDate ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // date icon and formatted date text
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
@@ -349,6 +359,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                         )
                     }
 
+                    // "add to calendar" clickable box
                     Box(
                         modifier = Modifier
                             .border(
@@ -362,6 +373,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                                 interactionSource = remember { MutableInteractionSource() }
                             ) {
                                 event?.let { evt ->
+                                    // check if calendar permissions are already granted
                                     val hasCalendarPermission =
                                         ContextCompat.checkSelfPermission(
                                             context,
@@ -373,6 +385,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                                                 ) == PackageManager.PERMISSION_GRANTED
 
                                     if (hasCalendarPermission) {
+                                        // permission already granted, add directly
                                         isPressed = true
                                         addEventToCalendarDirectly(context, evt)
                                         coroutineScope.launch {
@@ -380,6 +393,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                                             isPressed = false
                                         }
                                     } else {
+                                        // request permissions first
                                         pendingEvent = evt
                                         permissionLauncher.launch(
                                             arrayOf(
@@ -403,6 +417,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                 }
             }
 
+            // venue row with location icon
             event?.venue?.takeIf { it.isNotEmpty() }?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.LocationOn, "Venue", Modifier.size(16.dp))
@@ -415,7 +430,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
-            // booking details section
+            // booking details section showing category, seat, quantity, payment, total
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
@@ -452,9 +467,9 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
             val eventTime = event?.date?.toDate()?.time ?: 0L
             val isExpired = eventTime > 0 && currentTime > eventTime
 
-            // show either "View QR Code" button OR "QR Code Expired" box
+            // show either "view qr code" button or "qr code expired" box
             if (isExpired) {
-                // expired ticket - show gray box (not clickable)
+                // expired ticket - show gray non-clickable box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -484,7 +499,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                     }
                 }
             } else {
-                // activate ticket - show yellow button (clickable)
+                // active ticket - show yellow clickable button to view qr code
                 Button(
                     onClick = {
                         val intent = android.content.Intent(context, QRCodeActivity::class.java).apply {
@@ -502,7 +517,7 @@ fun BookingHistoryItem(booking: Booking, event: Event?) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFEB3B), // Yellow
+                        containerColor = Color(0xFFFFEB3B),
                         contentColor = Color.Black
                     ),
                     shape = RoundedCornerShape(8.dp)
@@ -538,36 +553,37 @@ fun DetailText(label: String, value: String) {
     }
 }
 
-// composable loading and displaying event image from firebase or url
+// composable loading and displaying event image from firebase storage or direct url
 @Composable
 fun EventImage(rawUrl: String?) {
     var displayUrl by remember { mutableStateOf<String?>(null) }
     var loadingError by remember { mutableStateOf(false) }
     LaunchedEffect(rawUrl) {
-        // reset states
+        // reset states when url changes
         loadingError = false
         displayUrl = null
 
         // clean up url string
         val cleanedUrl = rawUrl?.trim()
 
-        // if no url, mark as error
+        // if no url provided, mark as error
         if (cleanedUrl.isNullOrBlank()) {
             loadingError = true
             return@LaunchedEffect
         }
 
-        // if firebase storage path, get download url
+        // if firebase storage path (gs://), resolve to download url
         if (cleanedUrl.startsWith("gs://")) {
             try {
                 val storageRef = FirebaseStorage.getInstance().getReferenceFromUrl(cleanedUrl)
                 val uri = storageRef.downloadUrl.await()
                 displayUrl = uri.toString()
             } catch (e: Exception) {
-                Log.w("EventImage", "Failed to resolve gs:// url: $cleanedUrl", e)
+                Log.w("EventImage", "failed to resolve gs:// url: $cleanedUrl", e)
                 loadingError = true
             }
         } else {
+            // already a direct url, use as-is
             displayUrl = cleanedUrl
         }
     }
@@ -581,7 +597,7 @@ fun EventImage(rawUrl: String?) {
         Alignment.Center
     ) {
         if (displayUrl == null && !loadingError) {
-            // show loading spinner while fetching
+            // show loading spinner while fetching image url
             Box(
                 Modifier
                     .fillMaxSize()
@@ -591,7 +607,7 @@ fun EventImage(rawUrl: String?) {
                 CircularProgressIndicator()
             }
         } else if (loadingError) {
-            // show error message if loading failed
+            // show error message if image loading failed
             Box(
                 Modifier
                     .fillMaxSize()
@@ -605,7 +621,7 @@ fun EventImage(rawUrl: String?) {
                 )
             }
         } else {
-            // display image using coil
+            // display image using coil async image painter
             Image(
                 painter = rememberAsyncImagePainter(model = displayUrl),
                 contentDescription = null,
@@ -616,100 +632,104 @@ fun EventImage(rawUrl: String?) {
     }
 }
 
-// convert firebase timestamp to readable date string
+// convert firebase timestamp to readable date string in singapore timezone
 fun timestampToString(ts: Timestamp): String {
     return SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).apply {
         timeZone = TimeZone.getTimeZone("Asia/Singapore")
     }.format(ts.toDate())
 }
 
-// add event directly to phone's calendar database
 private fun addEventToCalendarDirectly(context: android.content.Context, event: Event) {
     try {
-        val eventDateMillis = event.date?.toDate()?.time
-
-        // if no date, show error
-        if (eventDateMillis == null) {
-            Toast.makeText(context, "Event date not available", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        // get device's calendar id
         val calendarId = getCalendarId(context)
 
-        // if no calendar found, show error
         if (calendarId == null) {
             Toast.makeText(context, "No calendar found on device.", Toast.LENGTH_LONG).show()
             return
         }
 
-        // build event data for calendar
+        val eventDateMillis = event.date?.toDate()?.time
+
+        if (eventDateMillis == null) {
+            Toast.makeText(context, "Event date not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // FIX: The time is 8 hours behind, so we need to ADD 8 hours
+        val eightHoursInMillis = 8 * 60 * 60 * 1000L
+        val correctedStartMillis = eventDateMillis + eightHoursInMillis
+        val correctedEndMillis = correctedStartMillis + (3 * 60 * 60 * 1000L) // 3 hour duration
+
         val values = ContentValues().apply {
-            put(CalendarContract.Events.DTSTART, eventDateMillis)
-            put(CalendarContract.Events.DTEND, eventDateMillis + (3 * 60 * 60 * 1000))
+            put(CalendarContract.Events.DTSTART, correctedStartMillis)
+            put(CalendarContract.Events.DTEND, correctedEndMillis)
             put(CalendarContract.Events.TITLE, event.name ?: "Concert")
-            val description = buildString {
+            put(CalendarContract.Events.DESCRIPTION, buildString {
                 append("Artist: ${event.artist ?: "Unknown"}\n")
                 append("Venue: ${event.venue ?: "TBA"}")
                 if (!event.description.isNullOrBlank()) {
                     append("\n\n${event.description}")
                 }
-            }
-            put(CalendarContract.Events.DESCRIPTION, description)
+            })
             put(CalendarContract.Events.EVENT_LOCATION, event.venue ?: "")
             put(CalendarContract.Events.CALENDAR_ID, calendarId)
-            put(CalendarContract.Events.EVENT_TIMEZONE, Calendar.getInstance().timeZone.id)
-            put(CalendarContract.Events.HAS_ALARM, 1)
+            put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
         }
 
-        // insert event into calendar
         val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
+
         if (uri != null) {
             val eventId = uri.lastPathSegment?.toLongOrNull()
 
+            // Add reminder
             if (eventId != null) {
-                // create reminder for 1 day before (1440 minutes)
                 val reminderValues = ContentValues().apply {
                     put(CalendarContract.Reminders.EVENT_ID, eventId)
-                    put(CalendarContract.Reminders.MINUTES, 1440)
+                    put(CalendarContract.Reminders.MINUTES, 30)
                     put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
                 }
-
-                // insert reminder
                 context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, reminderValues)
             }
 
-            // show success message
             Toast.makeText(context, "✓ Event added to calendar!", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(context, "Failed to add event to calendar", Toast.LENGTH_SHORT).show()
         }
     } catch (e: Exception) {
         Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }
-
 // get first available calendar id from device
 private fun getCalendarId(context: android.content.Context): Long? {
     return try {
-        // specify which columns to retrieve
-        val projection = arrayOf(CalendarContract.Calendars._ID)
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL
+        )
+
+        // Only get calendars we can write to
+        val selection = "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?"
+        val selectionArgs = arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString())
+
         val cursor = context.contentResolver.query(
             CalendarContract.Calendars.CONTENT_URI,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             null
         )
 
-        // read results
         cursor?.use {
+            Toast.makeText(context, "Found ${it.count} writable calendars", Toast.LENGTH_SHORT).show()
             if (it.moveToFirst()) {
-                // get calendar id
-                val idIndex = it.getColumnIndex(CalendarContract.Calendars._ID)
-                return it.getLong(idIndex)
+                return it.getLong(0)
             }
         }
         null
     } catch (e: Exception) {
+        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         null
     }
 }

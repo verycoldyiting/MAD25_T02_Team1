@@ -304,13 +304,34 @@ Yuhong -
 * Navigation Support: Includes a "Get Directions" button that seamlessly launches the external Google Maps app with the destination pre-filled.
 * Customizable Views: Users can toggle between Normal, Satellite, and Hybrid map layers.
 
+## Enhanced Stage 1 Feature: Biometric Login (Daphne)
+I enhanced the login flow with biometric authentication to improve usability and security. Users will be able to return and access the app more quickly without having to enter email and password. If users still prefer the traditional way of logging in they are able to toggle enable and disable at the profile page.
+1. Secure Biometric Authentication (Android BiometricPrompt)
+* Integrated AndroidX BiometricPrompt to support fingerprint or device credentials in a native and secure manner.
+* Biometric authentication is handled by the Android system; no biometric data is stored or accessed by the app.
+* Ensures compliance with Android security best practices by delegating authentication to the OS.
+2. Firebase Authentication Session Protection
+* Biometric login is only enabled after a successful email and password login.
+* The app verifies an existing Firebase Authentication session (currentUser) before allowing biometric authentication.
+* Prevents unauthorized access by ensuring biometrics act as a secure gate to unlock an existing authenticated session, rather than replacing Firebase authentication.
+3. User-Controlled Biometric Preference
+* Introduced a toggle in the Profile page allowing users to enable or disable biometric login at any time.
+* User preference is stored locally using SharedPreferences and respected on subsequent app launches.
+4. Improved Login Experience
+* Returning users with biometric login enabled are prompted for biometric authentication immediately upon app launch.
+* First-time users or users who disable biometrics continue to use the standard email and password login flow.
+* Clear error handling and fallback behavior are provided if biometric authentication is unavailable or fails
+* Supports accessibility and user choice for devices that do not support biometrics or users who prefer traditional login methods.
 
-Daphne -
-1. Biometric Login
-* Able to login via fingerprint. Have a button in the profile page where users can opt to enable or disable biometric login. Login will be based on the last login session. Authentication is handled using Android’s biometric framework, which ensures that sensitive biometric data is never stored within the application itself
-  
-2. Speech Navigation
-* Allow users to navigate between pages using simple commands like "home", "tickets", "assistance", "search". Speech input is processed by Android’s built-in speech recognition service, and recognised keywords are mapped to existing navigation routes.
 
-3. Smart search
-* Instead of requiring users to type full event names, the search function supports flexible input such as shortened terms (e.g. “bp”) and incomplete words. This is achieved through text normalisation and initials-based matching, which improves usability while keeping the search logic generic and scalable.
+## Stage 2 Feature: Speech Navigation (Daphne)
+I have added on a speech navigation allowing users to navigate between key sections of the app using voice command. This feature improves accessibility and hands-free interaction.
+1. Voice Command-Based Navigation Using Android Speech Recognizer
+* Integrated Android’s built-in Speech Recognizer API to capture and convert user voice input into text.
+* Users can trigger speech input via a dedicated microphone button and issue simple navigation commands such as “home”, “search”, “profile”, or “tickets”.
+* Recognised speech is mapped to existing navigation routes, enabling seamless page transitions without manual interaction.
+2. Accessibility and User Experience Enhancements
+* Supports hands-free navigation, improving accessibility for users who may have difficulty with touch input.
+* Provides clear feedback for unrecognised commands through on-screen messages, ensuring users understand how to interact with the feature.
+* Designed to complement existing navigation controls without disrupting standard user flows.
+

@@ -1,0 +1,40 @@
+[33mc3bcc72[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mnat[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{0}: pull origin main: Fast-forward
+[33m83bcbf1[m HEAD@{1}: checkout: moving from main to nat
+[33md5f596e[m[33m ([m[1;32mmain[m[33m)[m HEAD@{2}: commit (merge): Fixed merge conflicts
+[33me06fee9[m HEAD@{3}: merge nat: Merge made by the 'ort' strategy.
+[33m902e804[m HEAD@{4}: checkout: moving from nat to main
+[33m83bcbf1[m HEAD@{5}: commit: Fixed calander logic
+[33mbcef034[m[33m ([m[1;31morigin/nat[m[33m)[m HEAD@{6}: checkout: moving from main to nat
+[33m902e804[m HEAD@{7}: pull origin main: Fast-forward
+[33m9563ff7[m HEAD@{8}: checkout: moving from nat to main
+[33mbcef034[m[33m ([m[1;31morigin/nat[m[33m)[m HEAD@{9}: commit: Finalizing changes on nat
+[33mc0e8356[m HEAD@{10}: pull origin main: Fast-forward
+[33m3eb0ce5[m HEAD@{11}: pull origin main: Fast-forward
+[33m31a7040[m HEAD@{12}: pull origin main: Fast-forward
+[33md0215cc[m HEAD@{13}: rebase (abort): returning to refs/heads/nat
+[33m9205af0[m HEAD@{14}: rebase (continue): QR code implementation with 1 minute timer that auto refreshes a new qr code every 1 min, imported ZXing library on gradle.
+[33m07010b9[m HEAD@{15}: pull origin main --rebase (start): checkout 07010b98ae186e9d02dd3bc7c922452794309f6d
+[33md0215cc[m HEAD@{16}: commit: QR code implementation on a new page. QR code when scanned by another device will be showed a verification success page on our external website link thats stored in another repo
+[33m496b15b[m HEAD@{17}: pull origin main: Merge made by the 'ort' strategy.
+[33m9ea07c7[m HEAD@{18}: reset: moving to HEAD
+[33m9ea07c7[m HEAD@{19}: pull origin main: updating HEAD
+[33m9ea07c7[m HEAD@{20}: checkout: moving from nat to nat
+[33m9ea07c7[m HEAD@{21}: checkout: moving from main to nat
+[33m9563ff7[m HEAD@{22}: checkout: moving from nat to main
+[33m9ea07c7[m HEAD@{23}: checkout: moving from nat to nat
+[33m9ea07c7[m HEAD@{24}: commit (merge): Merged updated main with QR code into nat
+[33m4dea315[m HEAD@{25}: checkout: moving from main to nat
+[33m9563ff7[m HEAD@{26}: commit (merge): Merge branch 'main' of https://github.com/verycoldyiting/MAD25_T02_Team1
+[33me364d20[m HEAD@{27}: commit: QR code implementation and shade of yellow in edit profile being changed for the buttons in that page
+[33mf8aabdf[m HEAD@{28}: reset: moving to HEAD
+[33mf8aabdf[m HEAD@{29}: pull origin main: Fast-forward
+[33m007faea[m HEAD@{30}: checkout: moving from nat to main
+[33m4dea315[m HEAD@{31}: commit: QR code implementation with 1 minute timer that auto refreshes a new qr code every 1 min, imported ZXing library on gradle.
+[33m007faea[m HEAD@{32}: checkout: moving from main to nat
+[33m007faea[m HEAD@{33}: merge nat: Fast-forward
+[33m5922bf2[m HEAD@{34}: checkout: moving from nat to main
+[33m007faea[m HEAD@{35}: commit: added the calendar function in booking history, links the user's booking to the calendar's database so that it's added directly added onto phone calendar after the user gives permission
+[33m5922bf2[m HEAD@{36}: merge main: Fast-forward
+[33m80dc23a[m HEAD@{37}: checkout: moving from main to nat
+[33m5922bf2[m HEAD@{38}: commit: changed shade of yellow for buttons
+[33m80dc23a[m HEAD@{39}: clone: from https://github.com/verycoldyiting/MAD25_T02_Team1.git

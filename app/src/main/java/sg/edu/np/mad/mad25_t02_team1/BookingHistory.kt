@@ -688,7 +688,7 @@ private fun addEventToCalendarDirectly(context: android.content.Context, event: 
                 context.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, reminderValues)
             }
 
-            Toast.makeText(context, "✓ Event added to calendar!", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "âœ“ Event added to calendar!", Toast.LENGTH_LONG).show()
         } else {
             Toast.makeText(context, "Failed to add event to calendar", Toast.LENGTH_SHORT).show()
         }

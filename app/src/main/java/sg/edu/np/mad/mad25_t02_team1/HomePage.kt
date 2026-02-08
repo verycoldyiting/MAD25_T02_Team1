@@ -3,12 +3,9 @@ package sg.edu.np.mad.mad25_t02_team1
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -42,9 +39,8 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
 import androidx.navigation.compose.currentBackStackEntryAsState
-
-
-
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 class HomePage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,19 +78,22 @@ fun HomePageScaffold(startRoute: String? = null) {
         }
     }
 
-    val speechLauncher =
+    val speechResultLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                val spokenText =
-                    result.data
-                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                        ?.get(0)
-                        ?.lowercase()
 
-                spokenText?.let {
-                    handleSpeechNavigation(it, navController, context) { newTab ->
+                val command = result.data
+                    ?.getStringExtra(SpeechNavigationActivity.EXTRA_VOICE_COMMAND)
+                    ?.lowercase()
+
+                command?.let {
+                    handleSpeechNavigation(
+                        it,
+                        navController,
+                        context
+                    ) { newTab ->
                         selectedTab = newTab
                     }
                 }
@@ -138,7 +137,8 @@ fun HomePageScaffold(startRoute: String? = null) {
                     //Speech FAB
                     FloatingActionButton(
                         onClick = {
-                            startSpeech(speechLauncher)
+                            val intent = Intent(context, SpeechNavigationActivity::class.java)
+                            speechResultLauncher.launch(intent)
                         },
                         containerColor = Color.White,
                         elevation = FloatingActionButtonDefaults.elevation(8.dp),
@@ -448,40 +448,26 @@ fun handleSpeechNavigation(
     fun go(item: BottomNavItem) {
         setSelectedTab(item)
         navController.navigate(item.route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
             launchSingleTop = true
             restoreState = true
         }
     }
 
     when {
-        text.contains("home") -> go(BottomNavItem.Home)
+        text.contains("home") || text.contains("homepage")-> go(BottomNavItem.Home)
         text.contains("search") || text.contains("explore") -> go(BottomNavItem.Search)
-        text.contains("ticket") -> go(BottomNavItem.Tickets)
+        text.contains("ticket") || text.contains("booking") -> go(BottomNavItem.Tickets)
         text.contains("profile") -> go(BottomNavItem.Profile)
-        text.contains("chatbot") || text.contains("chat") || text.contains("help") || text.contains("assistance") -> {
-
+        text.contains("chatbot") || text.contains("help") || text.contains("assistance") -> {
             navController.navigate(AppRoute.Chatbot.route) {
                 launchSingleTop = true
             }
         }
         else -> {
-            Toast.makeText(context, "Sorry, I didn't understand", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Command not recognised", Toast.LENGTH_SHORT).show()
         }
     }
-}
-
-
-fun startSpeech(
-    launcher: androidx.activity.result.ActivityResultLauncher<Intent>
-) {
-    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-        putExtra(
-            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-        )
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
-        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now")
-    }
-    launcher.launch(intent)
 }

@@ -461,7 +461,7 @@ fun handleSpeechNavigation(
 
     when {
         text.contains("home") || text.contains("homepage")-> go(BottomNavItem.Home)
-        text.contains("search") || text.contains("explore") -> go(BottomNavItem.Search)
+        text.contains("search") || text.contains("explore") || text.contains("events") -> go(BottomNavItem.Search)
         text.contains("ticket") || text.contains("booking") -> go(BottomNavItem.Tickets)
         text.contains("profile") -> go(BottomNavItem.Profile)
         text.contains("chatbot") || text.contains("help") || text.contains("assistance") -> {

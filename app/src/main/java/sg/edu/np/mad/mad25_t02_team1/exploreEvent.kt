@@ -1,7 +1,7 @@
 package sg.edu.np.mad.mad25_t02_team1
 
-import android.util.Log
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,8 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,11 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import sg.edu.np.mad.mad25_t02_team1.models.Event
+import kotlin.math.min
 
 @Composable
 fun ExploreEventsApp() {
@@ -54,7 +55,6 @@ fun ExploreEventsApp() {
         errorMessage = null
 
         try {
-            // Only Firebase operations in the try block
             val db = FirebaseFirestore.getInstance()
             val result = db.collection("Events").get().await()
 
@@ -62,25 +62,19 @@ fun ExploreEventsApp() {
                 try {
                     document.toObject(Event::class.java)?.copy(id = document.id)
                 } catch (e: Exception) {
-                    // Log individual parsing errors but continue
                     Log.w("ExploreEvent", "Failed to parse event: ${document.id}", e)
                     null
                 }
             }
-
-            // Update state with fetched events
             allEvents = fetchedEvents
 
         } catch (e: FirebaseNetworkException) {
             errorMessage = "No internet connection. Please check your network and try again."
             Log.e("ExploreEvent", "Network error loading events", e)
-
         } catch (e: Exception) {
             errorMessage = "Failed to load events. Please try again later."
             Log.e("ExploreEvent", "Error loading event data", e)
-
         } finally {
-            // Data processing happens here - if Firebase succeeded, this always works
             availableGenres = allEvents.mapNotNull { it.genre }
                 .filter { it.isNotEmpty() }
                 .distinct()
@@ -100,8 +94,29 @@ fun ExploreEventsApp() {
 
         val filtered = upcomingOnly.filter { event ->
             val matchesSearch = if (searchQuery.isBlank()) true else {
-                event.artist?.contains(searchQuery, ignoreCase = true) == true ||
-                        event.name?.contains(searchQuery, ignoreCase = true) == true
+                val cleanQuery = searchQuery.trim().lowercase()
+                val artist = event.artist.orEmpty().lowercase()
+                val name = event.name.orEmpty().lowercase()
+
+                // 1. Standard Match
+                val standardMatch = artist.contains(cleanQuery) || name.contains(cleanQuery)
+
+                // 2. Fuzzy Match (Levenshtein)
+                val fuzzyMatch = if (cleanQuery.length > 3) {
+                    val artistDist = calculateLevenshteinDistance(cleanQuery, artist)
+                    val nameDist = calculateLevenshteinDistance(cleanQuery, name)
+                    val allowedEdits = if (cleanQuery.length > 7) 3 else 2
+                    artistDist <= allowedEdits || nameDist <= allowedEdits
+                } else false
+
+                // 3. Initials Match (e.g. "ts" -> "Taylor Swift")
+                val queryNoSpaces = cleanQuery.filter { it.isLetterOrDigit() }
+                val artistInitials = event.artist.orEmpty().split(" ").mapNotNull { it.firstOrNull()?.toString() }.joinToString("").lowercase()
+                val nameInitials = event.name.orEmpty().split(" ").mapNotNull { it.firstOrNull()?.toString() }.joinToString("").lowercase()
+
+                val initialsMatch = (queryNoSpaces.isNotEmpty() && (artistInitials.startsWith(queryNoSpaces) || nameInitials.startsWith(queryNoSpaces)))
+
+                standardMatch || fuzzyMatch || initialsMatch
             }
 
             val matchesGenre = if (selectedGenre == null) true else {
@@ -133,8 +148,8 @@ fun ExploreEventsApp() {
                     ErrorView(
                         message = errorMessage!!,
                         onRetry = {
-                            // Trigger re-composition by changing a key
                             errorMessage = null
+                            // Re-trigger loading logic if needed, or simply let composition retry
                         }
                     )
                 }
@@ -508,4 +523,19 @@ fun EventCard(
             }
         }
     }
+}
+
+fun calculateLevenshteinDistance(s1: String, s2: String): Int {
+    if (s1.isEmpty()) return s2.length
+    if (s2.isEmpty()) return s1.length
+    val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
+    for (i in 0..s1.length) dp[i][0] = i
+    for (j in 0..s2.length) dp[0][j] = j
+    for (i in 1..s1.length) {
+        for (j in 1..s2.length) {
+            val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
+            dp[i][j] = min(dp[i - 1][j] + 1, min(dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost))
+        }
+    }
+    return dp[s1.length][s2.length]
 }

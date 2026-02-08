@@ -778,6 +778,31 @@ fun ChatbotScreen(navController: NavController, viewModel: ChatbotViewModel = vi
 
     val context = LocalContext.current
 
+    val scope = rememberCoroutineScope()
+
+    val isNearBottom by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = listState.layoutInfo.totalItemsCount
+            lastVisible >= (total - 3).coerceAtLeast(0)  // "near bottom" = last 3 items
+        }
+    }
+
+    var showNewMsgButton by remember { mutableStateOf(false) }
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            if (isNearBottom) {
+                showNewMsgButton = false
+                listState.animateScrollToItem(messages.lastIndex)
+            } else {
+                showNewMsgButton = true
+            }
+        }
+    }
+
+
+
     val speechLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -829,32 +854,50 @@ fun ChatbotScreen(navController: NavController, viewModel: ChatbotViewModel = vi
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            LazyColumn(
-                state = listState,
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
             ) {
-                items(messages) { msg ->
-                    when (msg) {
-                        is ChatMessage.User -> UserMessageBubble(msg.text)
-                        is ChatMessage.Bot -> BotMessageBubble(
-                            message = msg,
-                            onTranslateClick = {
-                                viewModel.translateBotMessage(
-                                    msg.id,
-                                    msg.text,
-                                    msg.language
-                                )
-                            }
-                        )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(messages, key = { it.id }) { msg ->
+                        when (msg) {
+                            is ChatMessage.User -> UserMessageBubble(msg.text)
+                            is ChatMessage.Bot -> BotMessageBubble(
+                                message = msg,
+                                onTranslateClick = {
+                                    viewModel.translateBotMessage(msg.id, msg.text, msg.language)
+                                }
+                            )
+                            is ChatMessage.BotEvent -> EventCardBubble(msg.event)
+                            is ChatMessage.BotCarousel -> EventsCarousel(msg.events, navController)
+                            is ChatMessage.Loading -> LoadingAnimationBubble()
+                        }
+                    }
+                }
 
-                        is ChatMessage.BotEvent -> EventCardBubble(msg.event)
-                        is ChatMessage.BotCarousel -> EventsCarousel(msg.events, navController)
-                        is ChatMessage.Loading -> LoadingAnimationBubble()
+                if (showNewMsgButton) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                listState.animateScrollToItem(messages.lastIndex)
+                                showNewMsgButton = false
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Text("↓ New messages")
                     }
                 }
             }
+
 
             if (prompts.isNotEmpty()) {
                 LazyRow(

@@ -41,13 +41,18 @@ import kotlin.random.Random
 
 class PaymentPage : ComponentActivity() {
 
+
+    // Stripe PaymentSheet instance (Stripe SDK UI for collecting payment)
     private lateinit var paymentSheet: PaymentSheet
+
+    // Lambdas to be set by Compose and invoked when Stripe returns a result
     private var onStripeSuccess: (() -> Unit)? = null
     private var onStripeFailure: ((String) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Read booking details passed from previous screen
         val eventId = intent.getStringExtra("eventId") ?: ""
         val title = intent.getStringExtra("title") ?: ""
         val artist = intent.getStringExtra("artist") ?: ""
@@ -58,6 +63,7 @@ class PaymentPage : ComponentActivity() {
         val quantity = intent.getIntExtra("quantity", 1)
         val pricePerTicket = intent.getDoubleExtra("pricePerTicket", 0.0)
 
+        // Stripe client-side init (Publishable key is safe to embed).
         PaymentConfiguration.init(this, BuildConfig.STRIPE_PUBLISHABLE_KEY)
 
         paymentSheet = PaymentSheet(this) { result ->
@@ -83,6 +89,9 @@ class PaymentPage : ComponentActivity() {
                         section = section,
                         quantity = quantity,
                         pricePerTicket = pricePerTicket,
+
+                        //startStripePayment is called by PaymentScreen once it has a clientSecret.
+                        // It binds callbacks (onSuccess/onFailure), then presents Stripe PaymentSheet UI.
                         startStripePayment = { clientSecret, onSuccess, onFailure ->
                             onStripeSuccess = onSuccess
                             onStripeFailure = onFailure
@@ -117,13 +126,18 @@ fun PaymentScreen(
     val context = LocalContext.current
     val activity = context as? Activity
 
+    // Firebase services (remember so they aren't recreated during recomposition)
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
 
+    // Must match the Cloud Functions deployment region
     val FUNCTIONS_REGION = "asia-southeast1"
     val functions = remember { FirebaseFunctions.getInstance(FUNCTIONS_REGION) }
 
+    // Coroutine scope for async work (Firestore, Functions, Stripe)
     val scope = rememberCoroutineScope()
+
+    // Snackbar host for error/status messages
     val snackbarHostState = remember { SnackbarHostState() }
 
     var uid by remember { mutableStateOf(auth.currentUser?.uid) }
@@ -135,23 +149,29 @@ fun PaymentScreen(
         onDispose { auth.removeAuthStateListener(listener) }
     }
 
+    // Account collection lookup results
     var accountDocId by remember { mutableStateOf<String?>(null) }
     var accountError by remember { mutableStateOf<String?>(null) }
     var accountLoading by remember { mutableStateOf(true) }
 
+
+    // UI state flags
     var isProcessing by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    // Promo
+    // Promo code UI state
     var promoInput by remember { mutableStateOf("") }
     var appliedPromo by remember { mutableStateOf<String?>(null) }
     var discountAmount by remember { mutableStateOf(0.0) }
     var promoError by remember { mutableStateOf<String?>(null) }
 
+
+    // Price computation
     val subtotal = quantity * pricePerTicket
     val bookingFee = if (subtotal == 0.0) 0.0 else 3.5
     val finalTotal = (subtotal + bookingFee - discountAmount).coerceAtLeast(0.0)
 
+    // Format display date
     val dateText = if (dateMillis == 0L) {
         "Date TBA"
     } else {
@@ -198,12 +218,14 @@ fun PaymentScreen(
         }
     }
 
+    // Calls Firebase Callable Function createPaymentIntent to get Stripe clientSecret.
     suspend fun fetchClientSecret(amountCents: Int, bookingId: String): String {
         val user = auth.currentUser ?: throw Exception("Login required (FirebaseAuth currentUser is null).")
 
-        // Refresh token
+        // Ensure valid auth token for callable function (request.auth in backend)
         user.getIdToken(true).await()
 
+        // Payload sent to Cloud Function
         val data = hashMapOf(
             "amount" to amountCents,
             "currency" to "sgd",
@@ -297,17 +319,23 @@ fun PaymentScreen(
                                         val accDocId = accountDocId!!
                                         val bookingId = generateBookingId()
                                         val amountCents = (finalTotal * 100).toInt().coerceAtLeast(50)
+
+                                        // Step 1 Get clientSecret from Cloud Function
                                         val clientSecret = fetchClientSecret(amountCents, bookingId)
 
                                         isProcessing = false
 
+                                        // Step 2 Launch PaymentSheet using clientSecret
                                         startStripePayment(
                                             clientSecret,
+
+                                            // Success callback (Stripe payment completed)
                                             {
                                                 scope.launch {
                                                     try {
                                                         isProcessing = true
 
+                                                        // Determine payer name for receipt/booking display
                                                         val payerName =
                                                             auth.currentUser?.displayName
                                                                 ?: auth.currentUser?.email?.substringBefore("@")
@@ -334,6 +362,7 @@ fun PaymentScreen(
                                                             "PaymentStatus" to "Paid"
                                                         )
 
+                                                        // Step 3 Persist confirmed booking (only after successful payment)
                                                         db.collection("BookingDetails")
                                                             .document(bookingId)
                                                             .set(bookingData)
@@ -422,6 +451,7 @@ fun PaymentScreen(
                     }
                 }
 
+                // 4) Normal UI state: show event + pricing + promo controls
                 else -> {
                     Column(
                         modifier = Modifier
@@ -474,11 +504,13 @@ fun PaymentScreen(
 
                         Spacer(Modifier.height(16.dp))
 
+                        // Processing indicator while fetching clientSecret / saving booking
                         if (isProcessing) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Spacer(Modifier.height(8.dp))
                         }
 
+                        // Cancel exits this screen
                         SecondaryOutlineButton("Cancel", !isProcessing) { activity?.finish() }
                         Spacer(Modifier.height(12.dp))
                     }

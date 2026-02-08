@@ -1,6 +1,8 @@
+// Firebase Admin SDK (used to initialize the Firebase app context)
 const admin = require("firebase-admin");
 admin.initializeApp();
 
+// v2 callable functions + structured errors
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 
@@ -18,7 +20,7 @@ exports.createPaymentIntent = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Login required.");
     }
-
+    // Initialize Stripe SDK using secret key
     const stripe = getStripe();
 
     const amount = request.data.amount;
@@ -29,12 +31,13 @@ exports.createPaymentIntent = onCall(
       currency,
       automatic_payment_methods: { enabled: true },
       metadata: {
-        uid: request.auth.uid,
-        eventId: request.data.eventId || "",
-        bookingId: request.data.bookingId || ""
+        uid: request.auth.uid, // which user initiated payment
+        eventId: request.data.eventId || "",  // which event the payment is for
+        bookingId: request.data.bookingId || ""  // your internal booking reference
       }
     });
 
+    // Return clientSecret ONLY (safe to send to client).
     return { clientSecret: intent.client_secret };
   }
 );

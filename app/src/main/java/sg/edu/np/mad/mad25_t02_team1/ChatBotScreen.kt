@@ -1,6 +1,5 @@
 package sg.edu.np.mad.mad25_t02_team1
 
-
 import android.app.Activity
 import android.app.Application
 import android.content.Context
@@ -63,8 +62,6 @@ import kotlin.math.min
 import androidx.activity.result.ActivityResult
 
 
-
-
 // REPOSITORY
 object ChatRepository {
     private val _messages = MutableStateFlow<List<ChatMessage>>(
@@ -82,6 +79,7 @@ object ChatRepository {
         selectedEvent = null
     }
 
+    // Adds a new message bubble to the end of the list
     fun addMessage(msg: ChatMessage) {
         val currentList = _messages.value.toMutableList()
         currentList.add(msg)
@@ -129,15 +127,6 @@ object LevenshteinUtils {
         return cost[len0 - 1]
     }
 
-//    fun isCloseMatch(input: String, target: String, threshold: Int = 2): Boolean {
-//        val normalizedInput = input.lowercase().trim()
-//        val normalizedTarget = target.lowercase().trim()
-//
-//        if (normalizedInput == normalizedTarget) return true
-//        if (Math.abs(normalizedInput.length - normalizedTarget.length) > threshold) return false
-//
-//        return calculate(normalizedInput, normalizedTarget) <= threshold
-//    }
 }
 
 object TextFuzzy {
@@ -150,6 +139,7 @@ object TextFuzzy {
             .replace(Regex("\\s+"), " ")          // collapse spaces
     }
 
+    // Splits normalized text into tokens (words)
     fun tokens(s: String): List<String> =
         normalize(s).split(" ").filter { it.isNotBlank() }
 
@@ -164,13 +154,18 @@ object TextFuzzy {
         return (1.0 - dist / maxLen).coerceIn(0.0, 1.0)
     }
 
+
+    // Checks whether input contains a word/phrase "close enough" to target.
     fun fuzzyContains(input: String, target: String, threshold: Double = 0.78): Boolean {
         val inTokens = tokens(input)
         val t = normalize(target)
         if (t.isBlank()) return false
 
+        // 1-word match
         if (inTokens.any { similarity(it, t) >= threshold }) return true
 
+
+        // 2-word phrase match
         val windowSize = minOf(2, inTokens.size)
         if (windowSize >= 2) {
             for (i in 0..inTokens.size - 2) {
@@ -181,15 +176,22 @@ object TextFuzzy {
         return false
     }
 
+    // Returns the best similarity score between input and any keyword in keywords list.
+    // Used to find the most relevant FAQ for a user question.
+
     fun bestKeywordScore(input: String, keywords: List<String>, threshold: Double = 0.78): Double {
         var best = 0.0
         val inTokens = tokens(input)
 
         for (k in keywords) {
             val kk = normalize(k)
+
+            // compare each token
             for (t in inTokens) {
                 best = maxOf(best, similarity(t, kk))
             }
+
+            // compare 2-word phrases
             if (inTokens.size >= 2) {
                 for (i in 0..inTokens.size - 2) {
                     val phrase = inTokens[i] + " " + inTokens[i + 1]
@@ -201,7 +203,7 @@ object TextFuzzy {
     }
 }
 
-
+// Google Translation API
 class TranslationHelper {
     private val apiKey = BuildConfig.MY_API_KEY
     suspend fun detectLanguage(text: String): String = withContext(Dispatchers.IO) {
@@ -229,6 +231,8 @@ class TranslationHelper {
             try {
                 val urlString =
                     "https://translation.googleapis.com/language/translate/v2?key=$apiKey"
+
+                // Create request JSON body
                 val jsonBody = JSONObject().apply {
                     put("q", text)
                     put("target", targetLang)
@@ -237,11 +241,12 @@ class TranslationHelper {
                 val response = postJson(urlString, jsonBody.toString())
                 Log.d("ChatBot", "Raw Translation Response: $response")
 
+                // Extract translatedText
                 val data = JSONObject(response).getJSONObject("data")
                 val translations = data.getJSONArray("translations")
                 val rawText = translations.getJSONObject(0).getString("translatedText")
 
-                // Decode the HTML entities back to normal text
+                // Translate API returns HTML entities sometimes; decode them for display
                 HtmlCompat.fromHtml(rawText, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
             } catch (e: Exception) {
                 Log.e("ChatBot", "Translation Error", e)
@@ -291,31 +296,39 @@ sealed class ChatMessage(val id: String = UUID.randomUUID().toString()) {
 
 class ChatbotViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
+
+    // Translation helper for multilingual support
     private val translator = TranslationHelper()
 
+    // Expose repository state to UI
     val messages = ChatRepository.messages
     val suggestedPrompts = ChatRepository.suggestedPrompts
 
+    // Cached data lists from Firestore
     private var eventsList: List<Event> = emptyList()
     private var faqList: List<FAQ> = emptyList()
     private var seatCategoryList: List<SeatCategory> = emptyList()
 
 
     // Time helpers
+    // Convert Firestore Timestamp -> millis
 
     private fun eventMillis(e: Event): Long? = e.date?.toDate()?.time
 
+    // Used to filter only upcoming events
     private fun isUpcoming(e: Event): Boolean {
         val t = eventMillis(e) ?: return false
         return t >= System.currentTimeMillis()
     }
 
+    // Returns upcoming events sorted by date
     private fun upcomingEvents(): List<Event> {
         return eventsList
             .filter { isUpcoming(it) }
             .sortedBy { it.date }
     }
 
+    // Month calculation in Singapore timezone (prevents timezone mismatch)
     private fun getSgMonthIndex(date: java.util.Date): Int {
         val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Singapore"))
         cal.time = date
@@ -734,7 +747,7 @@ class ChatbotViewModel(application: Application) : AndroidViewModel(application)
     private fun removeLoading() = ChatRepository.removeLoading()
 }
 
-
+// Speech recognition launcher
 fun launchSpeechRecognizer(
     context: Context,
     launcher: ManagedActivityResultLauncher<Intent, ActivityResult>,
@@ -761,9 +774,6 @@ fun launchSpeechRecognizer(
         Toast.makeText(context, "Speech recognition not supported", Toast.LENGTH_SHORT).show()
     }
 }
-
-
-
 
 
 // 4. UI SCREEN
@@ -881,6 +891,7 @@ fun ChatbotScreen(navController: NavController, viewModel: ChatbotViewModel = vi
                     }
                 }
 
+                // If user scrolled up, show floating button to jump to latest messages
                 if (showNewMsgButton) {
                     Button(
                         onClick = {
@@ -913,6 +924,7 @@ fun ChatbotScreen(navController: NavController, viewModel: ChatbotViewModel = vi
             }
 
             Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Mic button: checks permission then launches speech recognizer
                 IconButton(onClick = {
                     if (ContextCompat.checkSelfPermission(
                             context,

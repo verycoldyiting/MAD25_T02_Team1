@@ -295,14 +295,22 @@ The Event Details page was enhanced to provide users with richer event context a
 * This improves transparency and reduces user confusion before purchase.
 
 
-Yuhong -
-1. Google Maps and Places API
-* Interactive Google Maps: Embeds a fully functional map fragment that automatically locates and pins the event venue using Geocoding.
-* Explore Nearby: Integrated with Google Places API to help users find amenities within a 500m walking radius:
-  * Food & Dining: Displays top-rated restaurants and eateries nearby (Green Pins).
-  * Transport: Locates the nearest bus stops and transit points (Blue Pins).
-* Navigation Support: Includes a "Get Directions" button that seamlessly launches the external Google Maps app with the destination pre-filled.
-* Customizable Views: Users can toggle between Normal, Satellite, and Hybrid map layers.
+##  Google Maps and Places API [Yu Hong]
+1. Interactive Google Maps: Embeds a fully functional map fragment that automatically locates and pins the event venue using Geocoding.
+2. Explore Nearby: Integrated with Google Places API to help users find amenities within a 500m walking radius:
+* Food & Dining: Displays top-rated restaurants and eateries nearby (Green Pins).
+* Transport: Locates the nearest bus stops and transit points (Blue Pins).
+3. Navigation Support: Includes a "Get Directions" button that seamlessly launches the external Google Maps app with the destination pre-filled.
+4. Customizable Views: Users can toggle between Normal, Satellite, and Hybrid map layers.
+
+## Enhanced Stage 1 Feature: Buy Ticket [Yu Hong]
+1. Enhanced buy ticket UI
+
+## Echanced Stage 1 Feature: Explore Event [Yu Hong]
+1. Search & Discovery Enhancements
+* Smart Search Algorithm: Implemented a robust local filtering system for the Explore page that supports:
+  * Initials Matching: Users can type "bp" for "Blackpink".
+  * Fuzzy Search (Levenshtein): Integrated tolerance for typos (e.g., "jblakcpink") to ensure users find events even with spelling mistakes.
 
 ## Enhanced Stage 1 Feature: Biometric Login (Daphne)
 I enhanced the login flow with biometric authentication to improve usability and security. Users will be able to return and access the app more quickly without having to enter email and password. If users still prefer the traditional way of logging in they are able to toggle enable and disable at the profile page.

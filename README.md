@@ -306,7 +306,7 @@ The Event Details page was enhanced to provide users with richer event context a
 ## Enhanced Stage 1 Feature: Buy Ticket [Yu Hong]
 1. Enhanced buy ticket UI
 
-## Echanced Stage 1 Feature: Explore Event [Yu Hong]
+## Enhanced Stage 1 Feature: Explore Event [Yu Hong]
 1. Search & Discovery Enhancements
 * Smart Search Algorithm: Implemented a robust local filtering system for the Explore page that supports:
   * Initials Matching: Users can type "bp" for "Blackpink".

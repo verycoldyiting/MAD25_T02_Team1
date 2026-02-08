@@ -211,51 +211,92 @@ Google AI Studio
 
 # Stage 2 Implemented features/enhancements:
 ## Enhanced Stage 1 Feature: Explore Page [Natalie Wong]
-Enhanced Stage 1 Feature: Explore Pages
-The Explore Page was enhanced to fix the incomplete filter logic highlighted during the stage 1 implementation and the broken try-catch logic.
-Firstly, I fixed the incomplete filter logic. My original filter only had a basic dropdown that changed the icon colour with no other visual feedback. However, for stage 2, I have added the following:
-* A filterchip that shows the active genre with a close button
-* A result count indicator ("X events found")
-* An "All Genres" option with a divider and visual highlighting of the selected genre in the dropdown
-* An empty state view ("No events found") with a "Clear all filters" button when filters return no results
+The Explore Page was enhanced to fix the incomplete filter logic highlighted during the Stage 1 implementation and the broken try-catch error handling. The original filter only had a basic dropdown that changed the icon colour with no other visual feedback, and the error handling silently failed with no user feedback.
+1. Refined Filter UX
+* Added a FilterChip composable that displays the active genre with a close/clear button for quick filter removal.
+* Added a result count indicator ("X events found") so users always know how many events match their current filters.
+* Added an "All Genres" option with a HorizontalDivider and visual highlighting of the selected genre in the DropdownMenu.
+* Added an empty state view ("No events found") with a "Clear all filters" button when filters return no results.
+2. Restructured Try-Catch Logic
+* Moved availableGenres extraction (mapping, filtering, sorting) out of the try block and into the finally block, since local data processing cannot fail if the Firebase fetch succeeded.
+* Moved availableGenres extraction (mapping, filtering, sorting) out of the try block and into the finally block, since local data processing cannot fail if the Firebase fetch succeeded.
+* Added isLoading and errorMessage states with an ErrorView composable displaying a Retry button, replacing the previous silent failure that left users with a blank screen.
 
-Secondly, I fixed broken try catch logic. My original code had availableGenres extraction (mapping, filtering, sorting) inside the try-catch block alongside the Firebase call. After carefully understanding and evaluating the code, I realised that my try catch logic was logically wrong, given Firebase successfully fetches the events, extracting genres from that already-fetched list can never fail in a meaningful way. You fixed this by:
-* Keeping only Firebase network operations inside the try block
-* Moving the genre extraction to the finally block, where it runs regardless of success/failure
-* Adding a specific catch for FirebaseNetworkException (network errors) vs a generic Exception catch.
 
 ## Enhanced Stage 1 Feature: Change Of Password from the Edit Profile Page  [Natalie Wong]
-The original Edit Profile page only had basic text fields for name, phone, and email, but password change functionality, so I added three password fields with visibility toggles, which included a Firebase re-authentication flow. I added currentPassword, newPassword, and confirmPassword fields, each with their own show "" Password boolean state. Each field has an eye icon (Visibility/VisibilityOff) that toggles between PasswordVisualTransformation and VisualTransformation.None, letting users peek at what they've typed. 
-For security, Firebase requires the user to re-authenticate before sensitive operations like password changes. Your updateProfile function checks if currentPassword and newPassword are provided. If so, it creates an EmailAuthProvider credential with the user's email and current password, calls user.reauthenticate(credential), and only upon success calls user.updatePassword(newPassword). If re-authentication fails, it returns "Current password is incorrect."
+The original Edit Profile page only had basic text fields for name, phone, and email, with no ability to select or upload a profile picture. I added the full image selection and upload pipeline, which works in two stages.
+1. Selecting the Photo from the Device (Android Photo Picker)
+* Implemented Android’s Photo Picker API to allow users to select a photo from their device gallery (e.g. Google Photos).
+* Set up three separate launchers for backward compatibility: PickVisualMedia (Android 13+ Tiramisu, no permissions required), GetContent with "image/*" (legacy fallback), and a RequestPermission launcher for READ_EXTERNAL_STORAGE on older versions.
+* The selectPhoto() function checks Build.VERSION.SDK_INT and routes to the appropriate picker or permission flow.
+* Stores the selected image in a selectedImageUri state for instant local preview before any upload occurs.
+2. Uploading to Firebase Storage on Save
+* On "Save Changes", the uploadImageAndUpdate() function uploads the image to Firebase Storage under profile_images/{uid}/{randomUUID}.jpg using putFile().
+* Retrieves the permanent download URL and saves it to the profileImageUrl field in Firestore, ensuring the profile picture persists across any device or session.
 
 ## Enhanced Stage 1 Feature: Upload Of Profile Picture from the Edit Profile Page [Natalie Wong]
-The original Edit Profile page only had basic text fields for name, phone, and email, but no ability to select or upload a profile picture. I added the full image selection and upload pipeline, which works in two stages:
-Part 1: Selecting the photo from the device:
-I implemented Android's photo picker to allow users to select a photo from their device's gallery (Google Photos). To ensure backward compatibility across different Android versions, I set up three separate launchers. For Android 13+ (Tiramisu), I used the modern PickVisualMedia API, which doesn't require runtime permissions. For older Android versions (6.0+), I used the legacy GetContent contract with "image/*" as a fallback, along with a RequestPermission launcher to handle READ_EXTERNAL_STORAGE at runtime. The selectPhoto() function acts as a router that checks Build.VERSION.SDK_INT and directs to the appropriate picker or permission request flow. When the user picks a photo, Android returns a local Uri(a temporary reference to that image file on the device.) I then store this in a selectedImageUri state and use it to show a local preview immediately in the circular profile picture area, without waiting for any upload. The display logic uses selectedImageUri?.toString() ?: profileImageUrl, meaning if a new photo has just been picked it shows the local preview, and if not it falls back to the existing Firestore URL.
+The original Edit Profile page had no password change functionality. I added a full in-page password change section with Firebase re-authentication for security.
+1. Password Fields with Visibility Toggles
+* Added three password fields: currentPassword, newPassword, and confirmPassword, each with their own boolean state for visibility toggling.
+* Each field has an eye icon (Visibility/VisibilityOff) that toggles between PasswordVisualTransformation and VisualTransformation.None.
+* Fields are always visible on the page (no toggle switch required) with a hint: "Leave blank if you don’t want to change password".
 
-Part 2: Uploading to Firebase Storage on save. The local Uri from Stage 1 is temporary and only accessible on the user's specific device if they logged in on another phone or cleared app data, the photo would be gone. So when "Save Changes" is pressed, the uploadImageAndUpdate() function checks if a selectedImageUri exists. If it does, it creates a reference in Firebase Storage under profile_images/{uid}/{randomUUID}.jpg, uploads the file with putFile(), retrieves the permanent download URL on success, and passes that URL to updateFirestore() which saves it to the profileImageUrl field in the Account document. This way, the profile picture persists across any device or session. If no new image was selected, it skips the upload entirely and proceeds with null.
-
+2. Firebase Re-authentication Flow
+* Validation checks: current password not blank, new password minimum 6 characters, and new/confirm passwords must match.
+* Creates an EmailAuthProvider.getCredential() with the user’s email and current password, calls user.reauthenticate(credential), and only on success calls user.updatePassword(newPassword).
+* If re-authentication fails, returns "Current password is incorrect" via Toast. The password update then chains into the email update and image upload steps sequentially.
 
 ## Enhanced Stage 1 Feature: Forget Password [Natalie Wong]
-The original Login page had no password recovery option so if a user forgot their password, they had no way to regain access to their account. However, to ensure proper password recovery, I added a complete Forget Password flow using Firebase Authentication's built-in password reset mechanism.
-I added an underlined "Forgot Password?" TextButton aligned to the right, positioned just below the password field. When tapped, it launches ForgotPasswordActivity via an Intent. I also restructured the bottom of the login page so that the Register option follows the same text-link style (a TextButton with underline reading "Don't have an account? Register") rather than being a full-sized yellow button, keeping the UI consistent and less cluttered.
-I then created a separate ForgotPasswordActivity with its own Scaffold and a top app bar titled "Reset Password" styled with the app's yellow theme colour. The activity first checks if it was opened from an email link (via intent?.data?.toString() and FirebaseAuth.isSignInWithEmailLink()), routing to ResetPasswordFromLinkScreen if so, or the normal ForgotPasswordScreen otherwise. The main screen displays an email icon, a "Forgot Password?" heading, and an explanatory subtitle. Below that is an OutlinedTextField for the user's email address. I added two layers of validation before submission to check that the field isn't blank, and verifying the format using android.util.Patterns.EMAIL_ADDRESS.matcher(). The "Send Reset Link" button shows a CircularProgressIndicator while the request is in progress (controlled by an isLoading state that also disables the text field and button to prevent duplicate submissions). On press, it calls FirebaseAuth.getInstance().sendPasswordResetEmail(email). If the call fails, it displays the error message via a Toast.
-Once the reset email is successfully sent, the UI switches from the email input form to a confirmation view (controlled by an emailSent boolean state). This confirmation screen displays a green CheckCircle success icon, a "Check Your Email" heading, and shows the email address the link was sent to. Below that is a Card styled with a light yellow background (Color(0xFFFFF9E6)) containing a "Next Steps" section that walks the user through the process: check inbox and spam folder, click the reset link, set a new password on the Firebase-hosted page, then return to the app and log in. At the bottom, there is a "Back to Login" button that navigates to LoginScreen with FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_NEW_TASK to clear the back stack, and a "Resend Email" TextButton that resets both the emailSent flag and the email field so the user can try again.
-This uses Firebase's secure, industry-standard password reset. Firebase sends an email containing a one-time reset link. The user clicks the link (which opens in their browser), enters their new password on Firebase's hosted page, and Firebase updates the password in Firebase Authentication. The user then returns to the app and logs in with their new password. This approach is secure because the app never handles raw password reset tokens where Firebase manages the entire verification and update process server-side.
+•	Validation checks: current password not blank, new password minimum 6 characters, and new/confirm passwords must match.
+•	Creates an EmailAuthProvider.getCredential() with the user’s email and current password, calls user.reauthenticate(credential), and only on success calls user.updatePassword(newPassword).
+•	If re-authentication fails, returns "Current password is incorrect" via Toast. The password update then chains into the email update and image upload steps sequentially.
 
 ## Add Event To Calendar - Stage 2 [Natalie Wong]
-The original Booking History page had no way for users to save an event to their phone's calendar. I added full Android calendar integration so users can add their booked events to their device calendar with a single tap.
-I added a clickable bordered box labelled "Add To Calendar" positioned on the same row as the event date, aligned to the right. It sits next to the date icon and formatted date text using a Row with Arrangement.SpaceBetween. The button has a subtle underline animationcwhen pressed. isPressed is set to true which applies TextDecoration.Underline, then a coroutine resets it after 300ms using delay() to give visual feedback. I used indication = null with a custom MutableInteractionSource to suppress the default Material ripple.
-Since writing to the Android calendar requires WRITE_CALENDAR and READ_CALENDAR permissions, I implemented a full permission request flow. I set up a rememberLauncherForActivityResult with ActivityResultContracts.RequestMultiplePermissions() that requests both permissions simultaneously. A pendingEvent state variable stores the event the user wants to add if permissions aren't yet granted, the event is held in pendingEvent while the permission dialog shows, and once granted, the calendar insertion proceeds automatically using the stored event. If the user denies permission, a Toast informs them that calendar access is required. If permissions are already granted (checked via ContextCompat.checkSelfPermission), it skips the request and adds the event directly.
-addEventToCalendarDirectly inserts it into the Android calendar. This private function handles the actual calendar insertion using Android's CalendarContract content provider. It first calls getCalendarId() to find the first writable calendar on the device by querying CalendarContract.Calendars.CONTENT_URI and filtering for calendars with at least CAL_ACCESS_CONTRIBUTOR level access. If no writable calendar exists (e.g. no Google account signed in), it shows a Toast and returns. It extracts the event date in milliseconds from the Firebase Timestamp, applies an 8-hour offset correction for the Singapore timezone, and sets a default event duration of 3 hours. I build a ContentValues object populated with the event title, a description containing the artist, venue, and event description, the event location, start/end times, calendar ID, and timezone set to "UTC". The event is inserted via context.contentResolver.insert(). On success, it also creates a 30-minute reminder by inserting into CalendarContract.Reminders.CONTENT_URI with METHOD_ALERT, and shows a " Event added to calendar!" Toast. The entire operation is wrapped in a try-catch that displays the error message if anything fails.
+The original Login page had no password recovery option. I added a complete Forget Password flow using Firebase Authentication’s built-in password reset mechanism.
+1. Login Page Integration
+* Added an underlined "Forgot Password?" TextButton below the password field that launches ForgotPasswordActivity via Intent.
+* Restructured the Register option to use the same text-link style ("Don’t have an account? Register") for consistent UI.
+2. Email input and validation
+* Created a separate activity with an OutlinedTextField for email input and two layers of validation: blank check and format verification via android.util.Patterns.EMAIL_ADDRESS.matcher().
+* On submit, calls FirebaseAuth.getInstance().sendPasswordResetEmail(email) with a CircularProgressIndicator and disabled inputs to prevent duplicate submissions.
+
+3. Post-submission confirmation screen
+* On success, switches to a confirmation view with a green CheckCircle icon, the recipient email, and a "Next Steps" Card guiding users through the reset process.
+* Includes a "Back to Login" button with FLAG_ACTIVITY_CLEAR_TOP to clear the back stack, and a "Resend Email" TextButton.
+* Uses Firebase’s secure, industry-standard email-based password reset — the app never handles raw password reset tokens; Firebase manages the entire verification server-side.
 
 ## QR Code Implementation - Stage 2 [Natalie Wong]
-The original Booking History page had no QR code functionality — tickets were displayed as static cards with no way to verify them at an event venue. I added a full QR code generation and verification system spanning three components: an in-app QR code screen, a separate hosted verification web page, and the integration between them.
-I created a dedicated QRCodeActivity and QRCodeScreen composable, accessible from each booking card via a "View QR Code" button. The booking card passes all ticket details (booking ID, event name, artist, venue, date, category, section, quantity, price per ticket) to the QR screen via Intent extras. The screen displays the event name, a ticket information card with all details laid out using QRTicketInfoRow composables, and the QR code image below.
-I also implemented a LaunchedEffect that runs an infinite loop generating a new QR code every 60 seconds for security. Each cycle, it creates a timestamp-based token by concatenating the booking ID, user email, and current System.currentTimeMillis(), then hashing it with SHA-256 via MessageDigest and truncating to 32 characters using generateSecureToken(). This token is appended to a verification URL along with all the ticket parameters (event name, artist, venue, date, category, section, quantity, price, email, booking ID). The URL is then encoded into a QR code bitmap using the ZXing library's QRCodeWriter, rendering a 512×512 pixel black-and-white Bitmap with BarcodeFormat.QR_CODE. A countdown display shows "Refreshes in X seconds" and counts down from 60 to 1 before the QR regenerates.
-On the booking card itself, I added logic that compares the event date against System.currentTimeMillis(). If the event has already passed (currentTime > eventTime), the "View QR Code" button is replaced with a grey non-clickable Card displaying "QR Code Expired" with a greyed-out icon, preventing users from generating QR codes for past events.
-To show that a user's QR code is valid upon entry, prevent ticket reselling and impersonation, I created a standalone HTML/CSS/JavaScript verification page and hosted it on a separate GitHub Pages repository (https://natalie-s10257861.github.io/MAD_Assignment2_TicketLahVerification/). When someone scans the QR code, it opens this web page in their browser. The JavaScript init() function reads all ticket parameters from the URL query string using URLSearchParams, then populates the page with the event name, artist, venue, date, category, section, quantity, price per ticket, purchaser email, and booking ID. It calculates the total price (price × quantity) and formats everything in Singapore dollars. The page displays a green "VERIFIED" banner with a checkmark icon, all ticket details in a structured layout with labelled rows, a highlighted total amount in orange, a security badge reading "Secured by TicketLah!", and a verification timestamp. The page is fully responsive with mobile-specific CSS media queries that stack the layout vertically on screens under 480px.
-Lastly, I also created a native Compose verification screen that handles deep link openings if the app intercepts the verification URL, it displays the same ticket information natively within the app using a Scaffold with a gradient background, green verified status card, event details with VerificationInfoRow composables, and a security footer. It reads the ticket data from activity.intent?.data URI query parameters.
+The original Booking History page had no QR code functionality — tickets were displayed as static cards with no way to verify them at a venue. I added a full QR code generation and verification system spanning three components: an in-app QR code screen, a separate hosted verification web page, and the integration between them.
+1. Dedicated QR Code Screen (ZXing Library)
+* Created a dedicated QRCodeActivity and QRCodeScreen composable, accessible via a "View QR Code" button on each booking card. Ticket details are passed via Intent extras.
+* Integrated the ZXing (Zebra Crossing) library for QR code generation. The generateQRCode() function uses QRCodeWriter to encode a verification URL into a BitMatrix using BarcodeFormat.QR_CODE, then renders a 512×512 pixel Bitmap (RGB_565) displayed via Compose’s asImageBitmap().
+
+2. 60 Second auto refresh with SHA-256 Token Security
+* Implemented a LaunchedEffect infinite loop that regenerates the QR code every 60 seconds for security, preventing screenshot-based ticket fraud.
+* Each cycle generates a token by concatenating booking ID, user email, and System.currentTimeMillis(), then hashing with SHA-256 via MessageDigest and truncating to 32 characters using generateSecureToken().
+* A countdown display shows "Refreshes in X seconds" and counts down from 60 to 1 before the QR regenerates.
+
+3. Expired Ticket Detection
+* Compares event date against System.currentTimeMillis(). If the event has passed, the "View QR Code" button is replaced with a grey non-clickable Card displaying "QR Code Expired", preventing QR generation for past events.
+4. Hosted Verification Web Page (Github Pages)
+* Created a standalone HTML/CSS/JavaScript verification page hosted on a separate GitHub Pages repository to validate tickets upon scanning and prevent ticket reselling and impersonation.
+* The JavaScript init() function reads ticket parameters from the URL query string using URLSearchParams and populates the page with event name, artist, venue, date, category, section, quantity, price, purchaser email, and booking ID.
+* Displays a green "VERIFIED" banner, total price in Singapore dollars, a "Secured by TicketLah!" security badge, and verification timestamp. Fully responsive with mobile CSS media queries for screens under 480px.
+
+5. Native In-App Verification Screen (Deep Link)
+* Created a native Compose TicketVerificationScreen that handles deep link openings if the app intercepts the verification URL, displaying the same ticket information natively with a gradient background, green verified status card, and VerificationInfoRow composables. Reads data from activity.intent?.data URI query parameters.
+
+## Add Event To Calendar - Stage 2 [Natalie Wong]
+The original Booking History page had no way for users to save an event to their phone’s calendar. I added full Android CalendarContract integration so users can add booked events to their device calendar with a single tap.
+1. Runtime Permission Handling
+* Implemented rememberLauncherForActivityResult with ActivityResultContracts.RequestMultiplePermissions() to request WRITE_CALENDAR and READ_CALENDAR simultaneously.
+* Uses a pendingEvent state to hold the event while the permission dialog shows, proceeding automatically once granted. Checks existing permissions via ContextCompat.checkSelfPermission to skip the request if already granted.
+
+2. Calendar Insertion via CalendarContract
+* The addEventToCalendarDirectly() function uses Android’s CalendarContract content provider. Calls getCalendarId() to find the first writable calendar by filtering for CAL_ACCESS_CONTRIBUTOR level access.
+* Builds a ContentValues object with event title, description (artist, venue), location, start/end times (with 8-hour Singapore timezone offset correction), and a default 3-hour duration. Inserts via contentResolver.insert().
+* On success, creates a 30-minute reminder via CalendarContract.Reminders with METHOD_ALERT and shows a "✓ Event added to calendar!" Toast. Entire operation wrapped in try-catch for error handling.
+
 
 ## Chatbot with Translation and speech to text capabilities [Valerie Kho]
 1. Multilingual Support - Google Cloud Translation API

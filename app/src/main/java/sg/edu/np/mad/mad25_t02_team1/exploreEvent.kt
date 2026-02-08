@@ -51,18 +51,14 @@ fun ExploreEventsApp() {
 
             val fetchedEvents = result.documents.mapNotNull { document ->
                 document.toObject(Event::class.java)?.copy(
-                    id = document.id // ensure ID captured
+                    id = document.id
                 )
             }
-
             allEvents = fetchedEvents
-
-            // extracts unique genres for the filter dropdown (from all events)
             availableGenres = fetchedEvents.mapNotNull { it.genre }
                 .filter { it.isNotEmpty() }
                 .distinct()
                 .sorted()
-
         } catch (e: Exception) {
             Log.e("ExploreEvent", "Error loading event data", e)
         }
@@ -70,20 +66,37 @@ fun ExploreEventsApp() {
 
     val now = System.currentTimeMillis()
 
-    // Filter out past events first, then apply search + genre filters
+    // 2. Smart Search (With Fuzzy Matching)
     val displayedEvents = remember(searchQuery, selectedGenre, allEvents, now) {
 
-        //  keep only upcoming events
         val upcomingOnly = allEvents.filter { event ->
             val t = event.date?.toDate()?.time ?: 0L
             (t == 0L) || (t >= now)
         }
 
-        // apply search + genre filters
         val filtered = upcomingOnly.filter { event ->
+
             val matchesSearch = if (searchQuery.isBlank()) true else {
-                event.artist?.contains(searchQuery, ignoreCase = true) == true ||
-                        event.name?.contains(searchQuery, ignoreCase = true) == true
+                val cleanQuery = searchQuery.trim().lowercase()
+                val artist = event.artist.orEmpty().lowercase()
+                val name = event.name.orEmpty().lowercase()
+
+                // 1. Exact/Contains Match
+                val standardMatch = artist.contains(cleanQuery) || name.contains(cleanQuery)
+
+                // 2. Fuzzy Match (Levenshtein Distance)
+                val fuzzyMatch = if (cleanQuery.length > 3) {
+                    val artistDist = calculateLevenshteinDistance(cleanQuery, artist)
+                    val nameDist = calculateLevenshteinDistance(cleanQuery, name)
+
+                    val allowedEdits = if (cleanQuery.length > 7) 3 else 2
+
+                    artistDist <= allowedEdits || nameDist <= allowedEdits
+                } else {
+                    false
+                }
+
+                standardMatch || fuzzyMatch
             }
 
             val matchesGenre = if (selectedGenre == null) true else {
@@ -93,7 +106,6 @@ fun ExploreEventsApp() {
             matchesSearch && matchesGenre
         }
 
-        // sort by soonest first; Date TBA goes last
         filtered.sortedWith(
             compareBy<Event> { e ->
                 val t = e.date?.toDate()?.time ?: 0L
@@ -102,16 +114,8 @@ fun ExploreEventsApp() {
         )
     }
 
-    Scaffold(
-        containerColor = Color.White
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            // search bar and filter icons
+    Scaffold(containerColor = Color.White) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).fillMaxSize().padding(16.dp)) {
             SearchBarWithFilter(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -120,13 +124,8 @@ fun ExploreEventsApp() {
                 selectedGenre = selectedGenre,
                 onGenreSelected = { genre -> selectedGenre = genre }
             )
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxSize()) {
                 items(displayedEvents, key = { it.id }) { event ->
                     EventCard(
                         event = event,
@@ -140,6 +139,32 @@ fun ExploreEventsApp() {
             }
         }
     }
+}
+
+// HELPER FUNCTION: Levenshtein Distance (Calculates "Edit Distance")
+fun calculateLevenshteinDistance(s1: String, s2: String): Int {
+    // If one string is empty, the distance is the length of the other
+    if (s1.isEmpty()) return s2.length
+    if (s2.isEmpty()) return s1.length
+
+    val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
+
+    // Initialize first row and column
+    for (i in 0..s1.length) dp[i][0] = i
+    for (j in 0..s2.length) dp[0][j] = j
+
+    // Calculate distances
+    for (i in 1..s1.length) {
+        for (j in 1..s2.length) {
+            val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
+            dp[i][j] = minOf(
+                dp[i - 1][j] + 1,       // Deletion
+                dp[i][j - 1] + 1,       // Insertion
+                dp[i - 1][j - 1] + cost // Substitution
+            )
+        }
+    }
+    return dp[s1.length][s2.length]
 }
 
 @Composable

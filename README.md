@@ -220,12 +220,80 @@ Natalie -
 3. QR Code implementation
 * Generating Qr Code with timer for each ticket in the booking history for ticket scanning. (This code creates a dynamic QR code display for each concert ticket with an automatic refresh timer. When the ticket card loads, it generates a unique QR code containing the booking details (ticket ID, event name, seat section, and category) plus a timestamp. A background timer counts down from 60 seconds, displayed as "Next refresh in X seconds" below the QR code. When the countdown reaches zero, the system automatically generates a completely new QR code by updating the timestamp, making each QR code unique and different from the previous one. This 60-second cycle repeats infinitely as long as the ticket is displayed, providing a constantly changing security QR code that never shows the same pattern twice. The entire process happens automatically without any user interaction or stored image files - everything is generated in real-time using the ZXing library.)
 
-Valerie -
-1. Chatbot
-* Allows message sending, voice input, and data retrieval with smart replies. It detects and translates languages, matches messages with artist info and events, responds to greetings, uses Levenshtein distance for keyword matching, provides smart replies, shows translated prompts, and cleans messages.
+## Chatbot with Translation and speech to text capabilities [Valerie Kho]
+1. Multilingual Support - Google Cloud Translation API
+* Automatically detects the language of the user input and responds accordingly.
+* Provides translations for both questions and answers, ensuring seamless communication in various languages.
+* Ensures accurate and relevant responses by processing the messages in the correct language.
+* Provides an optional “See English version” toggle for translated bot replies.
 
-2. Third party payment integration
-* Stripe handles all payment processing, including card validation and transaction security, ensuring that sensitive payment details are never stored on the device or application server. This provides a reliable and industry-standard payment experience for users.
+2. Speech-to-Text Integration
+* Allows users to interact with the chatbot using voice commands.
+* Voice input via Android Speech Recognizer with microphone permission handling and user-friendly fallback messages.
+* Converts spoken language into text for processing, enhancing accessibility and ease of use.
+
+3. Event Information Retrieval
+* Provides detailed information about various events, including start times, locations, and artist details.
+* Can answer specific questions related to events such as ticket purchase, refund policies, and accessibility options.
+
+4. Fuzzy Matching for Typos
+* Uses token normalization + Levenshtein Distance algorithm to find the closest matching keyword from the user input.
+* Ensures accurate responses even with minor typos or variations in the user's questions.
+
+5. Suggested Prompts
+* Displays a list of suggested prompts to guide users on what they can ask.
+* Prompts are translated into the detected language for better user understanding.
+
+6. FAQ Integration + Context-Aware Follow-up Questions
+* Fetches frequently asked questions (FAQs) from the Firestore database.
+* Provides quick and accurate answers to common queries related to events and services.
+* Stores the selected event context to answer follow-up questions (refund policy, accessibility, venue, timing) without repeating the event name.
+
+7. User-Friendly Interface
+* Features an intuitive and easy-to-navigate user interface.
+* Provides a smooth and engaging user experience with clear and concise responses.
+* Smart auto-scroll with “New messages” button for better chat UX.
+
+8. Robust Error Handling
+* Graceful fallbacks for translation failures, missing mic permissions, and unavailable speech recognition.
+
+## Enhanced Stage 1 Feature: Stripe Third-Party Payment Integration [Valerie Kho]
+The Payment Details Page has been enhanced to support a real third-party payment workflow using Stripe, improving checkout security, reliability, and overall user experience compared to Stage 1.
+1. Secure Stripe Checkout (PaymentSheet)
+* Integrated Stripe PaymentSheet for a native, secure card payment UX.
+* Payment details are handled by Stripe; the app does not store card data and only stores booking metadata in Firestore.
+* Displays clear payment states (processing indicator, cancel, error feedback via Snackbar).
+
+2. Backend PaymentIntent Creation via Firebase Cloud Functions
+* Uses Firebase Functions (asia-southeast1) to create a PaymentIntent and return a clientSecret.
+* Refreshes Firebase Auth token before calling the function to ensure authenticated requests.
+
+## Enhanced Stage 1 Feature: Booking History with 3-Tab Ticket Management [Valerie Kho]
+The Booking History feature was enhanced to improve usability and ticket management by introducing three ticket views (tabs) with smart filtering
+1. 3-Tab Ticket Filtering (Upcoming / Recently Purchased / Past)
+* Implemented a 3-tab filter system using TicketViewMode:
+    * **Upcoming: shows tickets for events that are happening later (or Date TBA), sorted by soonest event first.**
+    * **Recently Purchased: shows upcoming tickets sorted by latest purchase time first.**
+    * **Past: shows tickets for events that have already ended, sorted by most recent past event first.**
+* Each tab has a meaningful empty state message (e.g., “No upcoming tickets.”).
+
+## Enhanced Stage 1 Feature: Event Details Page with Dynamic Event Information + Past Event Handling [Valerie Kho]
+The Event Details page was enhanced to provide users with richer event context and safer interactions, by dynamically loading event data from Firestore, displaying structured event information, and preventing ticket purchase for ended events.
+1. Past Event Detection + Ticket Sales Disabled
+* Automatically detects whether an event is already over using event date vs current time.
+* If event has ended:
+    * **Shows a visible status label “Event Ended”**
+    * **Replaces “Buy Tickets” with a disabled message: “Ticket sales are closed.”**
+2. Structured “Event Information” Section (More Details for Users)
+* Adds a dedicated Event Information card that conditionally shows available fields such as:
+    * **Artist**
+    * **Genre**
+    * **Age Restriction**
+    * **Wheelchair Accessibility (Yes/No)**
+    * **Event Type (Indoor/Outdoor)**
+    * **Refund Policy**
+* This improves transparency and reduces user confusion before purchase.
+
 
 Yuhong -
 1. Google Maps and Places API

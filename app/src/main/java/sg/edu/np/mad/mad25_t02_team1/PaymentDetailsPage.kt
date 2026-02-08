@@ -490,10 +490,13 @@ fun PaymentScreen(
                                 TextButton(
                                     onClick = {
                                         showSuccessDialog = false
-                                        val intent = Intent(context, BookingHistoryActivity()::class.java).apply {
+                                        val intent = Intent(context, HomePage::class.java).apply {
                                             putExtra("startRoute", BottomNavItem.Tickets.route)
                                             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                         }
+                                        context.startActivity(intent)
+                                        activity?.finish()
+
                                         context.startActivity(intent)
                                         activity?.finish()
                                     }

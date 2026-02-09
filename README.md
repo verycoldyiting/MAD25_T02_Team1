@@ -219,7 +219,6 @@ The Explore Page was enhanced to fix the incomplete filter logic highlighted dur
 * Added an empty state view ("No events found") with a "Clear all filters" button when filters return no results.
 2. Restructured Try-Catch Logic
 * Moved availableGenres extraction (mapping, filtering, sorting) out of the try block and into the finally block, since local data processing cannot fail if the Firebase fetch succeeded.
-* Moved availableGenres extraction (mapping, filtering, sorting) out of the try block and into the finally block, since local data processing cannot fail if the Firebase fetch succeeded.
 * Added isLoading and errorMessage states with an ErrorView composable displaying a Retry button, replacing the previous silent failure that left users with a blank screen.
 
 

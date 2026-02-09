@@ -223,7 +223,7 @@ The Explore Page was enhanced to fix the incomplete filter logic highlighted dur
 * Added isLoading and errorMessage states with an ErrorView composable displaying a Retry button, replacing the previous silent failure that left users with a blank screen.
 
 
-## Enhanced Stage 1 Feature: Change Of Password from the Edit Profile Page  [Natalie Wong]
+## Enhanced Stage 1 Feature: Upload Of Profile Picture on Edit Profile Page [Natalie Wong]
 The original Edit Profile page only had basic text fields for name, phone, and email, with no ability to select or upload a profile picture. I added the full image selection and upload pipeline, which works in two stages.
 1. Selecting the Photo from the Device (Android Photo Picker)
 * Implemented Android’s Photo Picker API to allow users to select a photo from their device gallery (e.g. Google Photos).
@@ -234,7 +234,7 @@ The original Edit Profile page only had basic text fields for name, phone, and e
 * On "Save Changes", the uploadImageAndUpdate() function uploads the image to Firebase Storage under profile_images/{uid}/{randomUUID}.jpg using putFile().
 * Retrieves the permanent download URL and saves it to the profileImageUrl field in Firestore, ensuring the profile picture persists across any device or session.
 
-## Enhanced Stage 1 Feature: Upload Of Profile Picture from the Edit Profile Page [Natalie Wong]
+## Enhanced Stage 1 Feature: Change Of Password on Edit Profile Page [Natalie Wong]
 The original Edit Profile page had no password change functionality. I added a full in-page password change section with Firebase re-authentication for security.
 1. Password Fields with Visibility Toggles
 * Added three password fields: currentPassword, newPassword, and confirmPassword, each with their own boolean state for visibility toggling.
@@ -247,11 +247,7 @@ The original Edit Profile page had no password change functionality. I added a f
 * If re-authentication fails, returns "Current password is incorrect" via Toast. The password update then chains into the email update and image upload steps sequentially.
 
 ## Enhanced Stage 1 Feature: Forget Password [Natalie Wong]
-•	Validation checks: current password not blank, new password minimum 6 characters, and new/confirm passwords must match.
-•	Creates an EmailAuthProvider.getCredential() with the user’s email and current password, calls user.reauthenticate(credential), and only on success calls user.updatePassword(newPassword).
-•	If re-authentication fails, returns "Current password is incorrect" via Toast. The password update then chains into the email update and image upload steps sequentially.
 
-## Add Event To Calendar - Stage 2 [Natalie Wong]
 The original Login page had no password recovery option. I added a complete Forget Password flow using Firebase Authentication’s built-in password reset mechanism.
 1. Login Page Integration
 * Added an underlined "Forgot Password?" TextButton below the password field that launches ForgotPasswordActivity via Intent.
